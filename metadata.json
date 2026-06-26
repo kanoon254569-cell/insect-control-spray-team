@@ -1,0 +1,6 @@
+{
+  "name": "ทีมงานกำจัดปลวก - Insect Control Spray Team",
+  "description": "ระบบจัดการบริการกำจัดปลวกและแมลงแบบครบวงจร สำหรับลูกค้า ทีมงานช่าง และแอดมิน เพื่อการแจ้งปัญหา ติดตามงาน จัดสรรวันทำสัญญา และออกบิล",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
