@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   Bug, 
   User,
@@ -14,12 +14,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-// Portal components
-import CustomerPortal from './components/CustomerPortal';
-import TechnicianPortal from './components/TechnicianPortal';
-import AdminPortal from './components/AdminPortal';
 import LoginPage from './components/LoginPage';
 import RouteShell from './components/RouteShell';
+
+const CustomerPortal = lazy(() => import('./components/CustomerPortal'));
+const TechnicianPortal = lazy(() => import('./components/TechnicianPortal'));
+const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Seed & types
 import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType } from './types';
@@ -474,49 +474,57 @@ export default function App() {
         routeLabel={routeShellConfig.routeLabel}
         onLogout={handleLogout}
       >
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={`${session.role}-${route}`}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.15 }}
-          >
-            {session.role === 'customer' && (
-              <CustomerPortal
-                problems={problems}
-                onAddProblem={handleAddProblem}
-                packages={packages}
-                bookings={bookings}
-                onAddBooking={handleAddBooking}
-                contracts={contracts}
-                jobs={jobs}
-              />
-            )}
+        <Suspense
+          fallback={
+            <div className="flex min-h-[50vh] items-center justify-center rounded-[28px] border border-black/10 bg-white/80 p-6 text-slate-600 shadow-panel backdrop-blur">
+              <div className="text-sm font-semibold">กำลังโหลดหน้าที่ต้องใช้งาน...</div>
+            </div>
+          }
+        >
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${session.role}-${route}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.15 }}
+            >
+              {session.role === 'customer' && (
+                <CustomerPortal
+                  problems={problems}
+                  onAddProblem={handleAddProblem}
+                  packages={packages}
+                  bookings={bookings}
+                  onAddBooking={handleAddBooking}
+                  contracts={contracts}
+                  jobs={jobs}
+                />
+              )}
 
-            {session.role === 'technician' && (
-              <TechnicianPortal
-                jobs={jobs}
-                onUpdateJobStatus={handleUpdateJobStatus}
-              />
-            )}
+              {session.role === 'technician' && (
+                <TechnicianPortal
+                  jobs={jobs}
+                  onUpdateJobStatus={handleUpdateJobStatus}
+                />
+              )}
 
-            {session.role === 'user' && (
-              <AdminPortal
-                problems={problems}
-                bookings={bookings}
-                contracts={contracts}
-                jobs={jobs}
-                invoices={invoices}
-                packages={packages}
-                onAssignJob={handleAssignJob}
-                onAddInvoice={handleAddInvoice}
-                onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
-                onApproveJobCompletion={handleApproveJobCompletion}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+              {session.role === 'user' && (
+                <AdminPortal
+                  problems={problems}
+                  bookings={bookings}
+                  contracts={contracts}
+                  jobs={jobs}
+                  invoices={invoices}
+                  packages={packages}
+                  onAssignJob={handleAssignJob}
+                  onAddInvoice={handleAddInvoice}
+                  onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
+                  onApproveJobCompletion={handleApproveJobCompletion}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
       </RouteShell>
     </>
   );
