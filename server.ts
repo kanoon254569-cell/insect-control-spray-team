@@ -25,7 +25,8 @@ import type {
 } from './src/types';
 
 const app = express();
-const port = process.env.PORT || 8787;
+const port = Number(process.env.PORT ?? 8787);
+const host = '0.0.0.0';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dataDir = path.join(__dirname, 'data');
@@ -917,6 +918,6 @@ if (existsSync(path.join(__dirname, 'dist', 'index.html'))) {
 
 persistDb();
 
-app.listen(Number(port), '127.0.0.1', () => {
-  console.log(`Auth API listening on http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`Auth API listening on http://${host}:${port}`);
 });
