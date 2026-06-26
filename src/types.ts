@@ -88,4 +88,4 @@ export interface Invoice {
   createdAt: string;
 }
 
-export type PortalRole = 'customer' | 'technician' | 'admin';
+export type PortalRole = 'customer' | 'technician' | 'user';

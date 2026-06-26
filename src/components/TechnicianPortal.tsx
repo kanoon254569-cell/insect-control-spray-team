@@ -24,7 +24,7 @@ import { PRESET_CHEMICALS, PRESET_PHOTOS } from '../data';
 
 interface TechnicianPortalProps {
   jobs: TechnicianJob[];
-  onUpdateJobStatus: (jobId: string, status: JobStatus, updates?: Partial<TechnicianJob>) => void;
+  onUpdateJobStatus: (jobId: string, status: JobStatus, updates?: Partial<TechnicianJob>) => Promise<void> | void;
 }
 
 export default function TechnicianPortal({ jobs, onUpdateJobStatus }: TechnicianPortalProps) {
@@ -50,7 +50,7 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
     }
   };
 
-  const handleStatusChange = (jobId: string, currentStatus: JobStatus) => {
+  const handleStatusChange = async (jobId: string, currentStatus: JobStatus) => {
     let nextStatus: JobStatus;
     if (currentStatus === 'กำลังเตรียมตัว') nextStatus = 'กำลังเดินทาง';
     else if (currentStatus === 'กำลังเดินทาง') nextStatus = 'เริ่มดำเนินงาน';
@@ -69,10 +69,14 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       return;
     }
 
-    onUpdateJobStatus(jobId, nextStatus);
+    try {
+      await onUpdateJobStatus(jobId, nextStatus);
+    } catch {
+      alert('อัปเดตสถานะงานไม่สำเร็จ');
+    }
   };
 
-  const submitJobReport = () => {
+  const submitJobReport = async () => {
     if (!selectedJobId) return;
     if (!reportNotes.trim()) {
       alert('กรุณากรอกรายละเอียดบันทึกผลงานการกำจัดปลวก');
@@ -83,17 +87,21 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       return;
     }
 
-    onUpdateJobStatus(selectedJobId, 'ส่งงานแล้ว', {
-      notesByTech: reportNotes,
-      chemicalsUsed: selectedChemicals,
-      imageReport: selectedPhoto,
-      completedAt: new Date().toISOString()
-    });
+    try {
+      await onUpdateJobStatus(selectedJobId, 'ส่งงานแล้ว', {
+        notesByTech: reportNotes,
+        chemicalsUsed: selectedChemicals,
+        imageReport: selectedPhoto,
+        completedAt: new Date().toISOString()
+      });
 
-    setShowSubmitModal(false);
-    setReportNotes('');
-    setSelectedChemicals([]);
-    setSelectedPhoto('');
+      setShowSubmitModal(false);
+      setReportNotes('');
+      setSelectedChemicals([]);
+      setSelectedPhoto('');
+    } catch {
+      alert('ส่งรายงานงานช่างไม่สำเร็จ');
+    }
   };
 
   return (

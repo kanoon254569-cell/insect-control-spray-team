@@ -31,7 +31,7 @@ interface CustomerPortalProps {
     pestType: PestType;
     description: string;
     urgency: 'ต่ำ' | 'ปานกลาง' | 'สูง' | 'เร่งด่วนที่สุด';
-  }) => void;
+  }) => Promise<void> | void;
   packages: ServicePackage[];
   bookings: Booking[];
   onAddBooking: (booking: {
@@ -42,7 +42,7 @@ interface CustomerPortalProps {
     address: string;
     bookingDate: string;
     price: number;
-  }) => void;
+  }) => Promise<void> | void;
   contracts: Contract[];
   jobs: TechnicianJob[];
 }
@@ -82,56 +82,64 @@ export default function CustomerPortal({
   // Selected job for tracking details
   const [selectedTrackJobId, setSelectedTrackJobId] = useState<string | null>(null);
 
-  const handleReportSubmit = (e: React.FormEvent) => {
+  const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reportForm.customerName || !reportForm.customerPhone || !reportForm.address || !reportForm.description) {
       alert('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
-    onAddProblem(reportForm);
-    setReportSuccess(true);
-    setTimeout(() => {
-      setReportSuccess(false);
-      setReportForm({
-        customerName: '',
-        customerPhone: '',
-        address: '',
-        pestType: 'ปลวก',
-        description: '',
-        urgency: 'ปานกลาง'
-      });
-      setActiveTab('tracking');
-    }, 2000);
+    try {
+      await onAddProblem(reportForm);
+      setReportSuccess(true);
+      setTimeout(() => {
+        setReportSuccess(false);
+        setReportForm({
+          customerName: '',
+          customerPhone: '',
+          address: '',
+          pestType: 'ปลวก',
+          description: '',
+          urgency: 'ปานกลาง'
+        });
+        setActiveTab('tracking');
+      }, 2000);
+    } catch {
+      alert('ส่งรายงานไม่สำเร็จ');
+    }
   };
 
-  const handleBookingSubmit = (e: React.FormEvent) => {
+  const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPkg) return;
     if (!bookingForm.customerName || !bookingForm.customerPhone || !bookingForm.address || !bookingForm.bookingDate) {
       alert('กรุณากรอกข้อมูลจองคิวให้ครบถ้วน');
       return;
     }
-    onAddBooking({
-      packageId: selectedPkg.id,
-      packageName: selectedPkg.name,
-      customerName: bookingForm.customerName,
-      customerPhone: bookingForm.customerPhone,
-      address: bookingForm.address,
-      bookingDate: bookingForm.bookingDate,
-      price: selectedPkg.price
-    });
-    setBookingSuccess(true);
-    setTimeout(() => {
-      setBookingSuccess(false);
-      setSelectedPkg(null);
-      setBookingForm({
-        customerName: '',
-        customerPhone: '',
-        address: '',
-        bookingDate: ''
+    try {
+      await onAddBooking({
+        packageId: selectedPkg.id,
+        packageName: selectedPkg.name,
+        customerName: bookingForm.customerName,
+        customerPhone: bookingForm.customerPhone,
+        address: bookingForm.address,
+        bookingDate: bookingForm.bookingDate,
+        price: selectedPkg.price
       });
-      setActiveTab('tracking');
-    }, 2000);
+      setBookingSuccess(true);
+      setTimeout(() => {
+        setBookingSuccess(false);
+        setSelectedPkg(null);
+        setBookingForm({
+          customerName: '',
+          customerPhone: '',
+          address: '',
+          bookingDate: ''
+        });
+        setActiveTab('tracking');
+      }, 2000);
+    } catch {
+      alert('จองบริการไม่สำเร็จ');
+    }
   };
 
   return (

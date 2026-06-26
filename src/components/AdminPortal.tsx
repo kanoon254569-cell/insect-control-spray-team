@@ -44,10 +44,10 @@ interface AdminPortalProps {
   jobs: TechnicianJob[];
   invoices: Invoice[];
   packages: ServicePackage[];
-  onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking', teamName: string, date: string, title: string, desc: string) => void;
-  onAddInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNo' | 'createdAt'>) => void;
-  onUpdateInvoiceStatus: (invoiceId: string, status: 'ค้างชำระ' | 'ชำระเงินแล้ว') => void;
-  onApproveJobCompletion: (jobId: string) => void;
+  onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking', teamName: string, date: string, title: string, desc: string) => Promise<void> | void;
+  onAddInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNo' | 'createdAt'>) => Promise<void> | void;
+  onUpdateInvoiceStatus: (invoiceId: string, status: 'ค้างชำระ' | 'ชำระเงินแล้ว') => Promise<void> | void;
+  onApproveJobCompletion: (jobId: string) => Promise<void> | void;
 }
 
 export default function AdminPortal({
@@ -112,7 +112,7 @@ export default function AdminPortal({
     { name: 'ก.ค.', รายรับ: totalRevenue, ยอดจอง: bookings.length + problems.filter(p => p.status === 'เสร็จสิ้น').length }
   ];
 
-  const handleDispatchSubmit = (e: React.FormEvent) => {
+  const handleDispatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSourceId || !appointmentDate) {
       alert('กรุณาเลือกรายการจอง/แจ้งปัญหา และกำหนดวันลงนัดหมาย');
@@ -136,17 +136,20 @@ export default function AdminPortal({
       }
     }
 
-    onAssignJob(selectedSourceId, selectedSourceType, assignedTeam, appointmentDate, title, desc);
-    
-    setDispatchSuccess(true);
-    setTimeout(() => {
-      setDispatchSuccess(false);
-      setSelectedSourceId('');
-      setAppointmentDate('');
-    }, 2000);
+    try {
+      await onAssignJob(selectedSourceId, selectedSourceType, assignedTeam, appointmentDate, title, desc);
+      setDispatchSuccess(true);
+      setTimeout(() => {
+        setDispatchSuccess(false);
+        setSelectedSourceId('');
+        setAppointmentDate('');
+      }, 2000);
+    } catch {
+      alert('จัดคิวงานไม่สำเร็จ');
+    }
   };
 
-  const handleInvoiceCreateSubmit = (e: React.FormEvent) => {
+  const handleInvoiceCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!invoiceForm.customerName || !invoiceForm.customerPhone || !invoiceForm.address || !invoiceForm.dueDate) {
       alert('กรุณากรอกข้อมูลเพื่อจัดทำใบแจ้งหนี้ให้ครบถ้วน');
@@ -157,30 +160,34 @@ export default function AdminPortal({
     const vat = amount * 0.07;
     const totalAmount = amount + vat;
 
-    onAddInvoice({
-      customerName: invoiceForm.customerName,
-      customerPhone: invoiceForm.customerPhone,
-      address: invoiceForm.address,
-      description: invoiceForm.description,
-      amount,
-      vat,
-      totalAmount,
-      status: 'ค้างชำระ',
-      dueDate: invoiceForm.dueDate
-    });
-
-    setInvoiceSuccess(true);
-    setTimeout(() => {
-      setInvoiceSuccess(false);
-      setInvoiceForm({
-        customerName: '',
-        customerPhone: '',
-        address: '',
-        description: 'ค่าบริการสัญญาพ่นสเปรย์กำจัดปลวกประจำปี',
-        amount: 12000,
-        dueDate: ''
+    try {
+      await onAddInvoice({
+        customerName: invoiceForm.customerName,
+        customerPhone: invoiceForm.customerPhone,
+        address: invoiceForm.address,
+        description: invoiceForm.description,
+        amount,
+        vat,
+        totalAmount,
+        status: 'ค้างชำระ',
+        dueDate: invoiceForm.dueDate
       });
-    }, 2000);
+
+      setInvoiceSuccess(true);
+      setTimeout(() => {
+        setInvoiceSuccess(false);
+        setInvoiceForm({
+          customerName: '',
+          customerPhone: '',
+          address: '',
+          description: 'ค่าบริการสัญญาพ่นสเปรย์กำจัดปลวกประจำปี',
+          amount: 12000,
+          dueDate: ''
+        });
+      }, 2000);
+    } catch {
+      alert('สร้างใบแจ้งหนี้ไม่สำเร็จ');
+    }
   };
 
   return (
@@ -732,7 +739,13 @@ export default function AdminPortal({
                         
                         {inv.status === 'ค้างชำระ' && (
                           <button
-                            onClick={() => onUpdateInvoiceStatus(inv.id, 'ชำระเงินแล้ว')}
+                            onClick={async () => {
+                              try {
+                                await onUpdateInvoiceStatus(inv.id, 'ชำระเงินแล้ว');
+                              } catch {
+                                alert('อัปเดตสถานะใบแจ้งหนี้ไม่สำเร็จ');
+                              }
+                            }}
                             className="text-[10px] bg-emerald-500 text-white font-bold px-2 py-1 rounded hover:bg-emerald-600"
                           >
                             รับเงิน
@@ -811,7 +824,13 @@ export default function AdminPortal({
                     <td className="p-3">
                       {job.status === 'ส่งงานแล้ว' ? (
                         <button
-                          onClick={() => onApproveJobCompletion(job.id)}
+                          onClick={async () => {
+                            try {
+                              await onApproveJobCompletion(job.id);
+                            } catch {
+                              alert('ตรวจรับงานไม่สำเร็จ');
+                            }
+                          }}
                           className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] px-2 py-1 rounded-md"
                         >
                           ตรวจรับงาน
