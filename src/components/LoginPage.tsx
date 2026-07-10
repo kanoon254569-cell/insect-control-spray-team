@@ -32,7 +32,7 @@ const ROLE_OPTIONS: Array<{
 }> = [
   {
     role: 'user',
-    title: 'User / Admin',
+    title: 'Admin',
     subtitle: 'งานจัดการระบบ งานอนุมัติ และสรุปรายงาน',
     icon: <ShieldAlert className="h-5 w-5" />,
     hint: 'user / 1234'
