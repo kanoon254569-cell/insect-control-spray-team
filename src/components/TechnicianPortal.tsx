@@ -101,8 +101,8 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       setSelectedChemicals([]);
       setSelectedPhoto('');
       setSelectedPhotoName('');
-    } catch {
-      alert('ส่งรายงานงานช่างไม่สำเร็จ');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'ส่งรายงานงานช่างไม่สำเร็จ');
     }
   };
 
@@ -116,18 +116,15 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setSelectedPhoto(reader.result);
+    resizeReportPhoto(file)
+      .then((photoDataUrl) => {
+        setSelectedPhoto(photoDataUrl);
         setSelectedPhotoName(file.name);
-      }
-    };
-    reader.onerror = () => {
-      alert('อ่านไฟล์รูปภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
-      event.target.value = '';
-    };
-    reader.readAsDataURL(file);
+      })
+      .catch(() => {
+        alert('อ่านไฟล์รูปภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        event.target.value = '';
+      });
   };
 
   return (
@@ -591,4 +588,57 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       </AnimatePresence>
     </div>
   );
+}
+
+function resizeReportPhoto(file: File): Promise<string> {
+  const maxSize = 1600;
+  const quality = 0.82;
+
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Canvas is not available'));
+        return;
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(canvas.toDataURL('image/jpeg', quality));
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') resolve(reader.result);
+            else reject(new Error('Unable to read resized photo'));
+          };
+          reader.onerror = () => reject(reader.error ?? new Error('Unable to read resized photo'));
+          reader.readAsDataURL(blob);
+        },
+        'image/jpeg',
+        quality
+      );
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Unable to load photo'));
+    };
+
+    image.src = objectUrl;
+  });
 }

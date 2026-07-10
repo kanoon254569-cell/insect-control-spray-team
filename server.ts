@@ -45,7 +45,7 @@ const database = existsSync(dbPath)
   ? new SQL.Database(new Uint8Array(readFileSync(dbPath)))
   : new SQL.Database();
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const ACCOUNTS: Record<PortalRole, { password: string; displayName: string }> = {
   user: { password: '1234', displayName: 'User' },
