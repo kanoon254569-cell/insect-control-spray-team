@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { TechnicianJob, JobStatus } from '../types';
-import { PRESET_CHEMICALS, PRESET_PHOTOS } from '../data';
+import { PRESET_CHEMICALS } from '../data';
 
 interface TechnicianPortalProps {
   jobs: TechnicianJob[];
@@ -31,6 +31,7 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
   const [reportNotes, setReportNotes] = useState('');
   const [selectedChemicals, setSelectedChemicals] = useState<string[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string>('');
+  const [selectedPhotoName, setSelectedPhotoName] = useState<string>('');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   // Filter jobs by team
@@ -55,7 +56,8 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       if (job) {
         setReportNotes(job.notesByTech || '');
         setSelectedChemicals(job.chemicalsUsed || []);
-        setSelectedPhoto(job.imageReport || PRESET_PHOTOS[0].url);
+        setSelectedPhoto(job.imageReport || '');
+        setSelectedPhotoName(job.imageReport ? 'รูปที่แนบไว้ก่อนหน้า' : '');
         setShowSubmitModal(true);
         return;
       }
@@ -81,6 +83,10 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       alert('กรุณาเลือกสารเคมี/เหยื่อล่อที่ใช้งานอย่างน้อย 1 ชนิด');
       return;
     }
+    if (!selectedPhoto) {
+      alert('กรุณาแนบรูปถ่ายปฏิบัติงานจริง');
+      return;
+    }
 
     try {
       await onUpdateJobStatus(selectedJobId, 'ส่งงานแล้ว', {
@@ -94,9 +100,34 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
       setReportNotes('');
       setSelectedChemicals([]);
       setSelectedPhoto('');
+      setSelectedPhotoName('');
     } catch {
       alert('ส่งรายงานงานช่างไม่สำเร็จ');
     }
+  };
+
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setSelectedPhoto(reader.result);
+        setSelectedPhotoName(file.name);
+      }
+    };
+    reader.onerror = () => {
+      alert('อ่านไฟล์รูปภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+      event.target.value = '';
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -477,38 +508,63 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
                   />
                 </div>
 
-                {/* Attached Work Photo Selection Presets */}
+                {/* Attached Work Photo Upload */}
                 <div>
                   <label className="block text-xs font-extrabold text-slate-700 mb-1">
-                    แนบรูปถ่ายปฏิบัติงานพ่นสารเคมี (เลือกจากภาพจำลองหน้างานจริง) *
+                    แนบรูปถ่ายปฏิบัติงานพ่นสารเคมีจริง *
                   </label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
-                    {PRESET_PHOTOS.map((photo, index) => (
-                      <div
-                        key={index}
-                        onClick={() => setSelectedPhoto(photo.url)}
-                        className={`relative rounded-xl overflow-hidden cursor-pointer border-2 transition-all h-20 ${
-                          selectedPhoto === photo.url
-                            ? 'border-emerald-600 ring-2 ring-emerald-100'
-                            : 'border-slate-100 hover:border-slate-300'
-                        }`}
-                      >
-                        <img 
-                          src={photo.url} 
-                          alt={photo.name} 
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div className="absolute inset-0 bg-black/40 flex items-end p-1">
-                          <span className="text-[8px] text-white font-bold leading-tight truncate w-full">{photo.name}</span>
+                  <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_160px]">
+                    <label
+                      htmlFor="work-photo-upload"
+                      className="flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-slate-600 transition hover:border-amber-400 hover:bg-amber-50"
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-amber-600 shadow-xs">
+                        <Camera className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-extrabold text-slate-800">
+                          ถ่ายรูปหรือเลือกไฟล์จากเครื่อง
+                        </span>
+                        <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">
+                          {selectedPhotoName || 'รองรับไฟล์รูปภาพจากกล้องหรือแกลเลอรี'}
+                        </span>
+                      </span>
+                      <input
+                        id="work-photo-upload"
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handlePhotoUpload}
+                        className="sr-only"
+                      />
+                    </label>
+
+                    <div className="relative h-24 overflow-hidden rounded-xl border border-slate-200 bg-white">
+                      {selectedPhoto ? (
+                        <>
+                          <img
+                            src={selectedPhoto}
+                            alt="รูปถ่ายปฏิบัติงานจริงที่แนบ"
+                            className="h-full w-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhoto('');
+                              setSelectedPhotoName('');
+                            }}
+                            className="absolute right-1.5 top-1.5 rounded-full bg-slate-900/75 px-2 py-0.5 text-[10px] font-bold text-white hover:bg-slate-900"
+                          >
+                            ลบรูป
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex h-full flex-col items-center justify-center px-3 text-center text-[10px] font-bold text-slate-400">
+                          <Camera className="mb-1 h-5 w-5 text-slate-300" />
+                          ยังไม่ได้แนบรูปจริง
                         </div>
-                        {selectedPhoto === photo.url && (
-                          <div className="absolute top-1 right-1 bg-emerald-600 p-0.5 rounded-full text-white">
-                            <Check className="w-2.5 h-2.5" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      )}
+                    </div>
                   </div>
                 </div>
 
