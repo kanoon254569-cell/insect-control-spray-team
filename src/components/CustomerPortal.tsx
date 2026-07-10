@@ -76,6 +76,7 @@ export default function CustomerPortal({
 
   // Selected job for tracking details
   const [selectedTrackJobId, setSelectedTrackJobId] = useState<string | null>(null);
+  const [expandedReportPhoto, setExpandedReportPhoto] = useState<string | null>(null);
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -774,7 +775,7 @@ export default function CustomerPortal({
                           </div>
 
                           {/* Report Submission from Technician with photos */}
-                          {matchedJob && matchedJob.status === 'ส่งงานแล้ว' && (
+                          {matchedJob && (matchedJob.status === 'ส่งงานแล้ว' || matchedJob.status === 'เสร็จสิ้นและตรวจรับ') && (
                             <div className="border-t border-slate-100 pt-4 space-y-3">
                               <span className="text-xs font-bold text-emerald-800 flex items-center">
                                 <Activity className="w-4 h-4 mr-1 text-emerald-600" />
@@ -782,17 +783,21 @@ export default function CustomerPortal({
                               </span>
                               
                               {matchedJob.imageReport && (
-                                <div className="rounded-xl overflow-hidden border border-slate-100 relative">
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedReportPhoto(matchedJob.imageReport || null)}
+                                  className="group relative block w-full overflow-hidden rounded-xl border border-slate-100 text-left"
+                                >
                                   <img 
                                     src={matchedJob.imageReport} 
                                     alt="Work evidence" 
-                                    className="w-full h-40 object-cover"
+                                    className="w-full h-40 object-cover transition group-hover:scale-[1.01]"
                                     referrerPolicy="no-referrer"
                                   />
                                   <div className="absolute bottom-2 left-2 bg-slate-900/70 text-white text-[9px] px-2 py-0.5 rounded">
-                                    หลักฐานการปฏิบัติงานพ่นเคมี
+                                    หลักฐานการปฏิบัติงานพ่นเคมี - กดดูรูปเต็ม
                                   </div>
-                                </div>
+                                </button>
                               )}
 
                               <div className="space-y-1 bg-emerald-50/50 p-3 rounded-lg text-xs text-emerald-900">
@@ -924,6 +929,24 @@ export default function CustomerPortal({
           )}
         </AnimatePresence>
       </div>
+
+      {expandedReportPhoto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4">
+          <button
+            type="button"
+            onClick={() => setExpandedReportPhoto(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+          >
+            ปิด
+          </button>
+          <img
+            src={expandedReportPhoto}
+            alt="รูปหลักฐานขนาดเต็ม"
+            className="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+      )}
     </div>
   );
 }

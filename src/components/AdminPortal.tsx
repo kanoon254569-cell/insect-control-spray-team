@@ -75,6 +75,8 @@ export default function AdminPortal({
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [viewJob, setViewJob] = useState<TechnicianJob | null>(null);
+  const [expandedJobPhoto, setExpandedJobPhoto] = useState<string | null>(null);
 
   // Real-time calculation of statistics
   const totalRevenue = invoices
@@ -813,28 +815,129 @@ export default function AdminPortal({
                       )}
                     </td>
                     <td className="p-3">
-                      {job.status === 'ส่งงานแล้ว' ? (
+                      <div className="flex flex-col gap-1.5">
                         <button
-                          onClick={async () => {
-                            try {
-                              await onApproveJobCompletion(job.id);
-                            } catch {
-                              alert('ตรวจรับงานไม่สำเร็จ');
-                            }
-                          }}
-                          className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] px-2 py-1 rounded-md"
+                          type="button"
+                          onClick={() => setViewJob(job)}
+                          className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:border-amber-300 hover:text-amber-700"
                         >
-                          ตรวจรับงาน
+                          <Eye className="mr-1 h-3 w-3" />
+                          ดูรายละเอียด
                         </button>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-medium">ตรวจรับเสร็จสมบูรณ์</span>
-                      )}
+                        {job.status === 'ส่งงานแล้ว' ? (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await onApproveJobCompletion(job.id);
+                              } catch {
+                                alert('ตรวจรับงานไม่สำเร็จ');
+                              }
+                            }}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] px-2 py-1 rounded-md"
+                          >
+                            ตรวจรับงาน
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">ตรวจรับเสร็จสมบูรณ์</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* JOB REPORT DETAIL MODAL */}
+      {viewJob && (
+        <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl max-w-3xl w-full p-6 md:p-8 shadow-2xl border border-slate-100 relative max-h-[92vh] overflow-y-auto text-slate-800">
+            <button
+              type="button"
+              onClick={() => setViewJob(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-mono text-xl"
+            >
+              &times;
+            </button>
+
+            <div className="space-y-5">
+              <div className="border-b border-slate-100 pb-4">
+                <span className="text-[10px] font-mono font-bold text-slate-400">รหัสงาน: {viewJob.id}</span>
+                <h3 className="mt-1 text-lg font-extrabold text-slate-800">{viewJob.title}</h3>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">{viewJob.description}</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <span className="block font-bold text-slate-400">ทีมช่าง / นัดหมาย</span>
+                  <p className="mt-1 font-extrabold text-slate-800">{viewJob.assignedTeam}</p>
+                  <p className="font-bold text-amber-700">{viewJob.appointmentDate}</p>
+                </div>
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                  <span className="block font-bold text-slate-400">ลูกค้า / ที่อยู่</span>
+                  <p className="mt-1 font-extrabold text-slate-800">{viewJob.customerName}</p>
+                  <p className="leading-relaxed text-slate-500">{viewJob.address}</p>
+                </div>
+              </div>
+
+              {viewJob.imageReport ? (
+                <button
+                  type="button"
+                  onClick={() => setExpandedJobPhoto(viewJob.imageReport || null)}
+                  className="group relative block w-full overflow-hidden rounded-2xl border border-slate-100 bg-slate-100 text-left"
+                >
+                  <img
+                    src={viewJob.imageReport}
+                    alt="หลักฐานการปฏิบัติงาน"
+                    className="h-72 w-full object-cover transition group-hover:scale-[1.01]"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute bottom-3 left-3 rounded-full bg-slate-900/75 px-3 py-1 text-[10px] font-bold text-white">
+                    กดเพื่อดูรูปเต็ม
+                  </div>
+                </button>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center text-xs font-bold text-slate-400">
+                  ยังไม่มีรูปหลักฐานแนบในงานนี้
+                </div>
+              )}
+
+              <div className="rounded-2xl bg-emerald-50/60 p-4 text-xs text-emerald-900">
+                <div className="font-extrabold">สรุปเคมีและจุดลงงาน</div>
+                <p className="mt-2 leading-relaxed">{viewJob.notesByTech || 'ไม่มีบันทึกเพิ่มเติมจากช่าง'}</p>
+                {viewJob.chemicalsUsed && viewJob.chemicalsUsed.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {viewJob.chemicalsUsed.map((chem, idx) => (
+                      <span key={idx} className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold text-emerald-800">
+                        <Droplet className="mr-1 h-3 w-3 text-emerald-600" />
+                        {chem}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {expandedJobPhoto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4">
+          <button
+            type="button"
+            onClick={() => setExpandedJobPhoto(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-white hover:bg-white/20"
+          >
+            ปิด
+          </button>
+          <img
+            src={expandedJobPhoto}
+            alt="รูปหลักฐานขนาดเต็ม"
+            className="max-h-[90vh] max-w-full rounded-2xl object-contain shadow-2xl"
+            referrerPolicy="no-referrer"
+          />
         </div>
       )}
 
