@@ -1,16 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
-  Bug, 
-  User,
-  Wrench,
-  ShieldAlert,
-  CheckCircle,
-  Clock,
-  Info,
-  Layers,
-  ChevronRight,
-  Shield,
-  BookOpen
+  CheckCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -24,11 +14,6 @@ const AdminPortal = lazy(() => import('./components/AdminPortal'));
 // Seed & types
 import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType } from './types';
 import { 
-  INITIAL_PROBLEMS, 
-  INITIAL_BOOKINGS, 
-  INITIAL_CONTRACTS, 
-  INITIAL_JOBS, 
-  INITIAL_INVOICES, 
   INITIAL_PACKAGES 
 } from './data';
 

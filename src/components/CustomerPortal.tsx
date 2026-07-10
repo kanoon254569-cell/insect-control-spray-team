@@ -5,13 +5,8 @@ import {
   FileText, 
   CheckCircle, 
   Clock, 
-  User, 
-  Phone, 
-  MapPin, 
   Package, 
-  PlusCircle, 
   Check, 
-  ChevronRight, 
   Info,
   Shield,
   Activity,
@@ -658,7 +653,6 @@ export default function CustomerPortal({
                         : `สั่งซื้อแพ็กเกจบริการความคุ้มครอง คาดนัดหมายเข้าปฏิบัติการครั้งแรก`;
 
                       const customerName = selectedProblem ? selectedProblem.customerName : selectedBooking?.customerName;
-                      const customerPhone = selectedProblem ? selectedProblem.customerPhone : selectedBooking?.customerPhone;
                       const address = selectedProblem ? selectedProblem.address : selectedBooking?.address;
                       const apptDate = selectedProblem ? selectedProblem.appointmentDate : selectedBooking?.bookingDate;
 

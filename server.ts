@@ -485,11 +485,6 @@ function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates?: Pa
   }
 }
 
-function refreshAfterMutation() {
-  persistDb();
-  return getState();
-}
-
 seedDatabase();
 
 app.get('/api/health', (_req, res) => {

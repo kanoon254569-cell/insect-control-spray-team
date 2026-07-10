@@ -2,19 +2,14 @@ import React, { useState } from 'react';
 import { 
   MapPin, 
   Phone, 
-  Shield, 
-  Clock, 
   CheckCircle, 
   Camera, 
   Check, 
   Truck, 
   Wrench, 
-  Info,
   Sliders,
-  Calendar,
   AlertTriangle,
   Clipboard,
-  ExternalLink,
   Navigation,
   Droplet
 } from 'lucide-react';

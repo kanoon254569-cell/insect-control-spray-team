@@ -6,36 +6,28 @@ import {
   Users, 
   AlertTriangle, 
   PlusCircle, 
-  CheckCircle, 
   FileText, 
   Calendar, 
-  MapPin, 
-  Phone, 
   Eye, 
   Printer, 
   Wrench, 
   Briefcase, 
-  Inbox,
   Clock,
-  ChevronRight,
   Droplet
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
-  BarChart, 
-  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   AreaChart, 
   Area,
   PieChart,
   Pie,
   Cell
 } from 'recharts';
-import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType } from '../types';
+import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice } from '../types';
 
 interface AdminPortalProps {
   problems: PestProblem[];
@@ -56,7 +48,6 @@ export default function AdminPortal({
   contracts,
   jobs,
   invoices,
-  packages,
   onAssignJob,
   onAddInvoice,
   onUpdateInvoiceStatus,
@@ -339,7 +330,7 @@ export default function AdminPortal({
                         paddingAngle={5}
                         dataKey="count"
                       >
-                        {pestBreakdownData.map((entry, index) => (
+                        {pestBreakdownData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={PEST_COLORS[index % PEST_COLORS.length]} />
                         ))}
                       </Pie>

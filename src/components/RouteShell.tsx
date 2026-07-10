@@ -1,6 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
-import { Bug, ChevronRight, LogOut, Shield, Sparkles, User, Wrench, ShieldAlert } from 'lucide-react';
+import { Bug, LogOut, Sparkles } from 'lucide-react';
 import { PortalRole } from '../types';
 
 interface RouteShellProps {
@@ -12,24 +11,18 @@ interface RouteShellProps {
   children: React.ReactNode;
 }
 
-const ROLE_META: Record<PortalRole, { badge: string; icon: React.ReactNode; gradient: string; accent: string }> = {
+const ROLE_META: Record<PortalRole, { badge: string; gradient: string }> = {
   customer: {
     badge: 'Customer Workspace',
-    icon: <User className="h-4 w-4" />,
-    gradient: 'from-amber-600 via-orange-500 to-slate-900',
-    accent: 'text-amber-700'
+    gradient: 'from-amber-600 via-orange-500 to-slate-900'
   },
   technician: {
     badge: 'Technician Workspace',
-    icon: <Wrench className="h-4 w-4" />,
-    gradient: 'from-slate-900 via-slate-800 to-amber-800',
-    accent: 'text-slate-700'
+    gradient: 'from-slate-900 via-slate-800 to-amber-800'
   },
   user: {
     badge: 'User Workspace',
-    icon: <ShieldAlert className="h-4 w-4" />,
-    gradient: 'from-amber-700 via-slate-900 to-slate-950',
-    accent: 'text-amber-800'
+    gradient: 'from-amber-700 via-slate-900 to-slate-950'
   }
 };
 
@@ -70,47 +63,7 @@ export default function RouteShell({ role, title, subtitle, routeLabel, onLogout
         </div>
       </div>
 
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[280px_1fr] lg:px-8">
-        <aside className="space-y-4">
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-[28px] border border-black/10 bg-white/85 p-5 shadow-panel backdrop-blur"
-          >
-            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Current Route</div>
-            <div className={`mt-2 flex items-center gap-2 text-lg font-black ${meta.accent}`}>
-              {meta.icon}
-              <span>{routeLabel}</span>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              หน้านี้แยก shell ชัดเจนสำหรับบทบาทนี้ เพื่อให้การใช้งานและการอนุญาตดูเป็นระบบมากขึ้น
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="rounded-[28px] border border-black/10 bg-white/85 p-5 shadow-panel backdrop-blur"
-          >
-            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Route Tips</div>
-            <div className="mt-3 space-y-3 text-sm text-slate-700">
-              <div className="flex gap-2">
-                <ChevronRight className="mt-0.5 h-4 w-4 text-amber-600" />
-                <span>ระบบจะกันเข้าหน้านี้ถ้ายังไม่ล็อกอิน</span>
-              </div>
-              <div className="flex gap-2">
-                <ChevronRight className="mt-0.5 h-4 w-4 text-amber-600" />
-                <span>ข้อมูลทุกชุดมาจาก backend API เดียวกัน</span>
-              </div>
-              <div className="flex gap-2">
-                <ChevronRight className="mt-0.5 h-4 w-4 text-amber-600" />
-                <span>session เก็บไว้ใน cookie แบบ HttpOnly</span>
-              </div>
-            </div>
-          </motion.div>
-        </aside>
-
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-8">
         <section className="min-w-0">
           {children}
         </section>

@@ -6,7 +6,6 @@ import {
   Wrench,
   ShieldAlert,
   ArrowRight,
-  Lock,
   Eye,
   EyeOff
 } from 'lucide-react';
