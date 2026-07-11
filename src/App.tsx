@@ -12,7 +12,7 @@ const TechnicianPortal = lazy(() => import('./components/TechnicianPortal'));
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Seed & types
-import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType } from './types';
+import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember } from './types';
 import { 
   INITIAL_PACKAGES 
 } from './data';
@@ -53,6 +53,7 @@ export default function App() {
   const [jobs, setJobs] = useState<TechnicianJob[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [packages, setPackages] = useState(INITIAL_PACKAGES);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -116,18 +117,27 @@ export default function App() {
   };
 
   const loadServerState = async () => {
-    const response = await fetch('/api/state', { credentials: 'include' });
-    if (!response.ok) {
+    const [stateRes, teamRes] = await Promise.all([
+      fetch('/api/state', { credentials: 'include' }),
+      fetch('/api/team-members', { credentials: 'include' })
+    ]);
+
+    if (!stateRes.ok) {
       throw new Error('ไม่สามารถโหลดข้อมูลจากเซิร์ฟเวอร์ได้');
     }
 
-    const data = await response.json();
+    const data = await stateRes.json();
     setProblems(data.problems || []);
     setBookings(data.bookings || []);
     setContracts(data.contracts || []);
     setJobs(data.jobs || []);
     setInvoices(data.invoices || []);
     setPackages(data.packages || INITIAL_PACKAGES);
+
+    if (teamRes.ok) {
+      const teamData = await teamRes.json();
+      setTeamMembers(teamData.members || []);
+    }
   };
 
   const navigate = (path: AppPath, replace = false) => {
@@ -192,6 +202,7 @@ export default function App() {
         setJobs([]);
         setInvoices([]);
         setPackages(INITIAL_PACKAGES);
+        setTeamMembers([]);
       }
       navigate(ROLE_TO_PATH[result.role], true);
       showToast(`ยินดีต้อนรับ ${result.displayName}`, 'success');
@@ -223,6 +234,7 @@ export default function App() {
         setJobs([]);
         setInvoices([]);
         setPackages(INITIAL_PACKAGES);
+        setTeamMembers([]);
       }
       navigate(ROLE_TO_PATH[result.role], true);
       showToast(`สมัครบัญชีและเข้าสู่ระบบสำเร็จ: ${result.displayName}`, 'success');
@@ -550,10 +562,20 @@ export default function App() {
                   jobs={jobs}
                   invoices={invoices}
                   packages={packages}
+                  teamMembers={teamMembers}
                   onAssignJob={handleAssignJob}
                   onAddInvoice={handleAddInvoice}
                   onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
                   onApproveJobCompletion={handleApproveJobCompletion}
+                  onAddTeamMember={(member) => {
+                    // Will be implemented in AdminPortal
+                  }}
+                  onUpdateTeamMember={(memberId, updates) => {
+                    // Will be implemented in AdminPortal
+                  }}
+                  onDeleteTeamMember={(memberId) => {
+                    // Will be implemented in AdminPortal
+                  }}
                 />
               )}
             </motion.div>

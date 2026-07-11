@@ -27,7 +27,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice } from '../types';
+import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice, TeamMember, TeamMemberRole } from '../types';
 
 interface AdminPortalProps {
   problems: PestProblem[];
@@ -36,10 +36,14 @@ interface AdminPortalProps {
   jobs: TechnicianJob[];
   invoices: Invoice[];
   packages: ServicePackage[];
+  teamMembers: TeamMember[];
   onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking', teamName: string, date: string, title: string, desc: string) => Promise<void> | void;
   onAddInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNo' | 'createdAt'>) => Promise<void> | void;
   onUpdateInvoiceStatus: (invoiceId: string, status: 'ค้างชำระ' | 'ชำระเงินแล้ว') => Promise<void> | void;
   onApproveJobCompletion: (jobId: string) => Promise<void> | void;
+  onAddTeamMember: (member: Omit<TeamMember, 'id' | 'createdAt'>) => Promise<void> | void;
+  onUpdateTeamMember: (memberId: string, updates: Partial<TeamMember>) => Promise<void> | void;
+  onDeleteTeamMember: (memberId: string) => Promise<void> | void;
 }
 
 export default function AdminPortal({
@@ -48,12 +52,17 @@ export default function AdminPortal({
   contracts,
   jobs,
   invoices,
+  packages,
+  teamMembers,
   onAssignJob,
   onAddInvoice,
   onUpdateInvoiceStatus,
-  onApproveJobCompletion
+  onApproveJobCompletion,
+  onAddTeamMember,
+  onUpdateTeamMember,
+  onDeleteTeamMember
 }: AdminPortalProps) {
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'assignments' | 'billing' | 'history'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'assignments' | 'billing' | 'history' | 'team'>('dashboard');
 
   // Dispatch/Scheduling form states
   const [selectedSourceId, setSelectedSourceId] = useState<string>('');
@@ -72,6 +81,16 @@ export default function AdminPortal({
     dueDate: ''
   });
   const [invoiceSuccess, setInvoiceSuccess] = useState(false);
+
+  // Team member form states
+  const [teamForm, setTeamForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    role: 'team_member' as TeamMemberRole
+  });
+  const [teamSuccess, setTeamSuccess] = useState(false);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -236,6 +255,17 @@ export default function AdminPortal({
         >
           <Clock className="w-4 h-4" />
           <span>ประวัติงาน & รายงานสารเคมี</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('team')}
+          className={`px-5 py-3 text-xs font-bold transition-colors border-b-2 flex items-center space-x-2 ${
+            adminTab === 'team'
+              ? 'border-amber-600 text-amber-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>ตั้งค่าบัญชี-ลูกน้อง</span>
         </button>
       </div>
 
@@ -846,6 +876,215 @@ export default function AdminPortal({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: TEAM MANAGEMENT */}
+      {adminTab === 'team' && (
+        <div className="space-y-6">
+          {/* Add/Edit Team Member Form */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
+            <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-amber-600" />
+              {editingMemberId ? 'แก้ไขสมาชิกทีมงาน' : 'เพิ่มสมาชิกทีมงานใหม่'}
+            </h3>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              try {
+                if (editingMemberId) {
+                  await onUpdateTeamMember(editingMemberId, teamForm);
+                  setEditingMemberId(null);
+                } else {
+                  await onAddTeamMember({ ...teamForm, status: 'active' });
+                }
+                setTeamSuccess(true);
+                setTimeout(() => setTeamSuccess(false), 2000);
+                setTeamForm({ name: '', phone: '', email: '', role: 'team_member' });
+              } catch {
+                alert('บันทึกข้อมูลไม่สำเร็จ');
+              }
+            }} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ชื่อ-นามสกุล</span>
+                  <input
+                    value={teamForm.name}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, name: e.target.value }))}
+                    required
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                    placeholder="เช่น สมชาย ใจกระเด้"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">เบอร์โทรศัพท์</span>
+                  <input
+                    value={teamForm.phone}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, phone: e.target.value }))}
+                    required
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                    placeholder="เช่น 081-234-5678"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">อีเมล</span>
+                  <input
+                    type="email"
+                    value={teamForm.email}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, email: e.target.value }))}
+                    required
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                    placeholder="example@mail.com"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">บทบาท</span>
+                  <select
+                    value={teamForm.role}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, role: e.target.value as TeamMemberRole }))}
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                  >
+                    <option value="team_lead">หัวหน้าทีม (Team Lead) - ดูทุกข้อมูล + ส่งงาน</option>
+                    <option value="team_member">สมาชิกทีม (Team Member) - ดูปัญหา + เวลางาน เท่านั้น</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
+                >
+                  {editingMemberId ? 'อัปเดตข้อมูล' : 'เพิ่มสมาชิกใหม่'}
+                </button>
+                {editingMemberId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingMemberId(null);
+                      setTeamForm({ name: '', phone: '', email: '', role: 'team_member' });
+                    }}
+                    className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition"
+                  >
+                    ยกเลิก
+                  </button>
+                )}
+              </div>
+
+              {teamSuccess && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold">
+                  ✓ บันทึกข้อมูลสำเร็จ
+                </div>
+              )}
+            </form>
+          </div>
+
+          {/* Team Members List */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
+            <h3 className="text-sm font-extrabold text-slate-800 mb-4">รายชื่อสมาชิกทีมงานทั้งหมด ({teamMembers.length})</h3>
+
+            {teamMembers.length === 0 ? (
+              <p className="text-xs text-slate-500 italic">ยังไม่มีสมาชิกทีมงาน</p>
+            ) : (
+              <div className="overflow-x-auto border border-slate-100 rounded-xl">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 text-slate-600 text-left border-b border-slate-100">
+                    <tr>
+                      <th className="p-3">ชื่อ-นามสกุล</th>
+                      <th className="p-3">เบอร์โทร</th>
+                      <th className="p-3">อีเมล</th>
+                      <th className="p-3">บทบาท</th>
+                      <th className="p-3">สถานะ</th>
+                      <th className="p-3">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {teamMembers.map((member) => (
+                      <tr key={member.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-800">{member.name}</td>
+                        <td className="p-3 font-mono text-slate-600">{member.phone}</td>
+                        <td className="p-3 text-slate-600">{member.email}</td>
+                        <td className="p-3">
+                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${
+                            member.role === 'team_lead'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-slate-100 text-slate-800'
+                          }`}>
+                            {member.role === 'team_lead' ? 'หัวหน้าทีม' : 'สมาชิกทีม'}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${
+                            member.status === 'active'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}>
+                            {member.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}
+                          </span>
+                        </td>
+                        <td className="p-3 flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingMemberId(member.id);
+                              setTeamForm({
+                                name: member.name,
+                                phone: member.phone,
+                                email: member.email,
+                                role: member.role
+                              });
+                            }}
+                            className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded text-[9px]"
+                          >
+                            แก้ไข
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`คุณแน่ใจที่จะลบ ${member.name} ออกจากระบบหรือไม่?`)) {
+                                try {
+                                  await onDeleteTeamMember(member.id);
+                                } catch {
+                                  alert('ลบข้อมูลไม่สำเร็จ');
+                                }
+                              }
+                            }}
+                            className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold rounded text-[9px]"
+                          >
+                            ลบ
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Permission Guide */}
+          <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200">
+            <h4 className="font-extrabold text-blue-900 text-sm mb-3">ℹ️ คู่มือสิทธิการเข้าถึง</h4>
+            <div className="space-y-2 text-xs text-blue-800">
+              <div>
+                <span className="font-bold">หัวหน้าทีม (Team Lead):</span>
+                <ul className="ml-4 mt-1 space-y-1 list-disc text-blue-700">
+                  <li>ดูข้อมูลปัญหา จองบริการ สัญญา งาน และใบแจ้งหนี้ทั้งหมด</li>
+                  <li>สามารถส่งงาน และอัปเดตสถานะงานได้</li>
+                  <li>เข้าถึง Admin Panel ได้บางส่วน</li>
+                </ul>
+              </div>
+              <div>
+                <span className="font-bold">สมาชิกทีม (Team Member):</span>
+                <ul className="ml-4 mt-1 space-y-1 list-disc text-blue-700">
+                  <li>ดูเฉพาะปัญหา และเวลางานที่มอบหมายให้เท่านั้น</li>
+                  <li>ไม่สามารถส่งงาน หรือแก้ไขข้อมูลได้</li>
+                  <li>ไม่มีสิทธิเข้า Admin Panel</li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       )}

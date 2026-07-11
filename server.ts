@@ -22,7 +22,9 @@ import type {
   PestType,
   PortalRole,
   ServicePackage,
-  TechnicianJob
+  TechnicianJob,
+  TeamMember,
+  TeamMemberRole
 } from './src/types';
 
 const app = express();
@@ -81,6 +83,7 @@ type JobDocument = TechnicianJob & { createdAt: string };
 
 const users = database.collection<UserRow>('users');
 const sessions = database.collection<SessionRow>('sessions');
+const teamMembersCollection = database.collection<TeamMember>('teamMembers');
 const packagesCollection = database.collection<ServicePackage>('packages');
 const problemsCollection = database.collection<PestProblem>('problems');
 const bookingsCollection = database.collection<Booking>('bookings');
@@ -165,6 +168,7 @@ async function createIndexes() {
     users.createIndex({ username: 1, role: 1 }, { unique: true }),
     sessions.createIndex({ sessionId: 1 }, { unique: true }),
     sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    teamMembersCollection.createIndex({ id: 1 }, { unique: true }),
     packagesCollection.createIndex({ id: 1 }, { unique: true }),
     problemsCollection.createIndex({ id: 1 }, { unique: true }),
     bookingsCollection.createIndex({ id: 1 }, { unique: true }),
@@ -657,6 +661,68 @@ app.patch('/api/invoices/:invoiceId/status', async (req, res) => {
 
   await invoicesCollection.updateOne({ id: invoiceId }, { $set: { status } });
 
+  return res.json({ ok: true });
+});
+
+// Team Members Management APIs
+app.get('/api/team-members', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const members = await teamMembersCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
+  return res.json({ members });
+});
+
+app.post('/api/team-members', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { name, phone, email, role } = req.body ?? {};
+
+  if (!name || !phone || !email || !role) {
+    return res.status(400).json({ message: 'กรุณากรอกข้อมูลทั้งหมด' });
+  }
+
+  if (role !== 'team_lead' && role !== 'team_member') {
+    return res.status(400).json({ message: 'บทบาทไม่ถูกต้อง' });
+  }
+
+  const membersCount = await dbCount(teamMembersCollection);
+  const member: TeamMember = {
+    id: makeId('tm', 1000, membersCount),
+    name,
+    phone,
+    email,
+    role,
+    createdAt: new Date().toISOString(),
+    status: 'active'
+  };
+
+  await teamMembersCollection.insertOne(member);
+  return res.status(201).json({ member });
+});
+
+app.patch('/api/team-members/:memberId', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { memberId } = req.params;
+  const { name, phone, email, role, status } = req.body ?? {};
+
+  const updateData: Record<string, unknown> = {};
+  if (name) updateData.name = name;
+  if (phone) updateData.phone = phone;
+  if (email) updateData.email = email;
+  if (role && (role === 'team_lead' || role === 'team_member')) updateData.role = role;
+  if (status && (status === 'active' || status === 'inactive')) updateData.status = status;
+
+  if (Object.keys(updateData).length === 0) {
+    return res.status(400).json({ message: 'ไม่มีข้อมูลที่จะอัปเดต' });
+  }
+
+  await teamMembersCollection.updateOne({ id: memberId }, { $set: updateData });
+  return res.json({ ok: true });
+});
+
+app.delete('/api/team-members/:memberId', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { memberId } = req.params;
+
+  await teamMembersCollection.deleteOne({ id: memberId });
   return res.json({ ok: true });
 });
 
