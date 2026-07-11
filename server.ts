@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import mysql, { Pool, PoolConnection } from 'mysql2/promise';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -49,11 +49,11 @@ const pool = databaseUrl
 
 app.use(express.json({ limit: '10mb' }));
 
-const ACCOUNTS: Record<PortalRole, { password: string; displayName: string }> = {
-  user: { password: '1234', displayName: 'User' },
-  technician: { password: '1234', displayName: 'Technician' },
-  customer: { password: '1234', displayName: 'Customer' }
-};
+const DEFAULT_ACCOUNTS: Array<{ username: string; password: string; role: PortalRole; displayName: string }> = [
+  { username: 'user', password: '1234', role: 'user', displayName: 'Admin' },
+  { username: 'technician', password: '1234', role: 'technician', displayName: 'Technician' },
+  { username: 'customer', password: '1234', role: 'customer', displayName: 'Customer' }
+];
 
 type SessionRow = {
   role: PortalRole;
@@ -63,6 +63,15 @@ type SessionRow = {
 };
 
 type QueryRunner = Pool | PoolConnection;
+
+type UserRow = {
+  id: string;
+  username: string;
+  passwordHash: string;
+  role: PortalRole;
+  displayName: string;
+  createdAt: string;
+};
 
 function serializeCookie(
   name: string,
@@ -85,6 +94,33 @@ function parseCookies(header = '') {
     acc[name] = decodeURIComponent(rest.join('='));
     return acc;
   }, {});
+}
+
+function isPortalRole(value: unknown): value is PortalRole {
+  return value === 'user' || value === 'technician' || value === 'customer';
+}
+
+function normalizeUsername(username: unknown) {
+  return typeof username === 'string' ? username.trim().toLowerCase() : '';
+}
+
+function normalizeDisplayName(displayName: unknown, username: string) {
+  return typeof displayName === 'string' && displayName.trim().length > 0 ? displayName.trim() : username;
+}
+
+function hashPassword(password: string) {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, storedHash: string) {
+  const [salt, hash] = storedHash.split(':');
+  if (!salt || !hash) return false;
+
+  const storedBuffer = Buffer.from(hash, 'hex');
+  const candidateBuffer = scryptSync(password, salt, storedBuffer.length);
+  return storedBuffer.length === candidateBuffer.length && timingSafeEqual(storedBuffer, candidateBuffer);
 }
 
 async function queryAll<T = Record<string, unknown>>(sql: string, params: unknown[] = [], runner: QueryRunner = pool): Promise<T[]> {
@@ -240,6 +276,9 @@ async function dbCount(table: string, runner: QueryRunner = pool) {
 
 async function createSchema() {
   await execute(
+    'CREATE TABLE IF NOT EXISTS users (id VARCHAR(64) PRIMARY KEY, username VARCHAR(191) NOT NULL, passwordHash TEXT NOT NULL, role VARCHAR(32) NOT NULL, displayName VARCHAR(255) NOT NULL, createdAt VARCHAR(64) NOT NULL, UNIQUE KEY unique_user_role (username, role)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+  );
+  await execute(
     'CREATE TABLE IF NOT EXISTS sessions (sessionId VARCHAR(64) PRIMARY KEY, role VARCHAR(32) NOT NULL, username VARCHAR(255) NOT NULL, displayName VARCHAR(255) NOT NULL, expiresAt BIGINT NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
   await execute(
@@ -303,7 +342,8 @@ async function requireSession(req: express.Request, res: express.Response) {
 
 async function createSession(role: PortalRole, username: string) {
   const sessionId = randomUUID();
-  const displayName = ACCOUNTS[role].displayName;
+  const user = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [username, role]);
+  const displayName = user?.displayName ?? username;
   const expiresAt = Date.now() + SESSION_TTL_MS;
   await execute(
     'INSERT INTO sessions (sessionId, role, username, displayName, expiresAt) VALUES (?, ?, ?, ?, ?)',
@@ -317,8 +357,36 @@ async function clearSession(sessionId: string | null) {
   await execute('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
 }
 
+async function createUser(username: string, password: string, role: PortalRole, displayName: string, runner: QueryRunner = pool) {
+  const user: UserRow = {
+    id: randomUUID(),
+    username,
+    passwordHash: hashPassword(password),
+    role,
+    displayName,
+    createdAt: new Date().toISOString()
+  };
+
+  await execute(
+    'INSERT INTO users (id, username, passwordHash, role, displayName, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+    [user.id, user.username, user.passwordHash, user.role, user.displayName, user.createdAt],
+    runner
+  );
+
+  return user;
+}
+
+async function seedDefaultUsers() {
+  for (const account of DEFAULT_ACCOUNTS) {
+    const existing = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [account.username, account.role]);
+    if (existing) continue;
+    await createUser(account.username, account.password, account.role, account.displayName);
+  }
+}
+
 async function seedDatabase() {
   await createSchema();
+  await seedDefaultUsers();
   if ((await dbCount('packages')) > 0) return;
 
   await transaction(async (connection) => {
@@ -511,16 +579,17 @@ app.post('/api/login', async (req, res) => {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลเข้าสู่ระบบให้ครบถ้วน' });
   }
 
-  const account = ACCOUNTS[role as PortalRole];
-  if (!account) {
+  if (!isPortalRole(role)) {
     return res.status(400).json({ message: 'ไม่พบบทบาทผู้ใช้งาน' });
   }
 
-  if (username !== role || password !== account.password) {
+  const normalizedUsername = normalizeUsername(username);
+  const user = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [normalizedUsername, role]);
+  if (!user || typeof password !== 'string' || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
 
-  const session = await createSession(role as PortalRole, username);
+  const session = await createSession(role, normalizedUsername);
   res.setHeader(
     'Set-Cookie',
     serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -532,6 +601,51 @@ app.post('/api/login', async (req, res) => {
   );
 
   return res.json({
+    token: session.sessionId,
+    role: session.role,
+    username: session.username,
+    displayName: session.displayName
+  });
+});
+
+app.post('/api/register', async (req, res) => {
+  const { username, password, displayName, role } = req.body ?? {};
+  const normalizedUsername = normalizeUsername(username);
+
+  if (!normalizedUsername || typeof password !== 'string' || !password || !role) {
+    return res.status(400).json({ message: 'กรุณากรอกข้อมูลสมัครบัญชีให้ครบถ้วน' });
+  }
+
+  if (!isPortalRole(role)) {
+    return res.status(400).json({ message: 'ไม่พบบทบาทผู้ใช้งาน' });
+  }
+
+  if (normalizedUsername.length < 3) {
+    return res.status(400).json({ message: 'Username ต้องมีอย่างน้อย 3 ตัวอักษร' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
+  }
+
+  const existing = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [normalizedUsername, role]);
+  if (existing) {
+    return res.status(409).json({ message: 'มีบัญชีนี้ในบทบาทที่เลือกแล้ว' });
+  }
+
+  const user = await createUser(normalizedUsername, password, role, normalizeDisplayName(displayName, normalizedUsername));
+  const session = await createSession(user.role, user.username);
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(SESSION_COOKIE, session.sessionId, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL_MS
+    })
+  );
+
+  return res.status(201).json({
     token: session.sessionId,
     role: session.role,
     username: session.username,

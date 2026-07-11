@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Bug,
@@ -14,11 +14,13 @@ import { PortalRole } from '../types';
 type LoginValues = {
   username: string;
   password: string;
+  displayName: string;
   role: PortalRole;
 };
 
 interface LoginPageProps {
   onLogin: (values: LoginValues) => Promise<void>;
+  onRegister: (values: LoginValues) => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -28,50 +30,36 @@ const ROLE_OPTIONS: Array<{
   title: string;
   subtitle: string;
   icon: React.ReactNode;
-  hint: string;
 }> = [
   {
     role: 'user',
     title: 'Admin',
     subtitle: 'งานจัดการระบบ งานอนุมัติ และสรุปรายงาน',
-    icon: <ShieldAlert className="h-5 w-5" />,
-    hint: 'user / 1234'
+    icon: <ShieldAlert className="h-5 w-5" />
   },
   {
     role: 'technician',
     title: 'Technician',
     subtitle: 'คิวงานช่าง อัปเดตสถานะ และส่งรายงานหน้างาน',
-    icon: <Wrench className="h-5 w-5" />,
-    hint: 'technician / 1234'
+    icon: <Wrench className="h-5 w-5" />
   },
   {
     role: 'customer',
     title: 'Customer',
     subtitle: 'แจ้งปัญหา จองแพ็กเกจ และติดตามงานบริการ',
-    icon: <User className="h-5 w-5" />,
-    hint: 'customer / 1234'
+    icon: <User className="h-5 w-5" />
   }
 ];
 
-export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
+export default function LoginPage({ onLogin, onRegister, loading, error }: LoginPageProps) {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [values, setValues] = useState<LoginValues>({
-    username: 'user',
-    password: '1234',
+    username: '',
+    password: '',
+    displayName: '',
     role: 'user'
   });
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    const selected = ROLE_OPTIONS.find((item) => item.role === values.role);
-    if (selected) {
-      setValues((prev) => ({
-        ...prev,
-        username: selected.role,
-        password: '1234'
-      }));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values.role]);
 
   const activeRole = useMemo(
     () => ROLE_OPTIONS.find((item) => item.role === values.role) ?? ROLE_OPTIONS[0],
@@ -80,6 +68,10 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === 'register') {
+      await onRegister(values);
+      return;
+    }
     await onLogin(values);
   };
 
@@ -101,9 +93,30 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                 NP Place Control Co., Ltd.
               </div>
               <h1 className="text-2xl font-black tracking-tight text-slate-900">
-                เข้าสู่ระบบ
+                {mode === 'register' ? 'สมัครบัญชี' : 'เข้าสู่ระบบ'}
               </h1>
             </div>
+          </div>
+
+          <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl border border-black/10 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => !loading && setMode('login')}
+              className={`rounded-xl px-3 py-2 text-xs font-extrabold transition ${
+                mode === 'login' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              เข้าสู่ระบบ
+            </button>
+            <button
+              type="button"
+              onClick={() => !loading && setMode('register')}
+              className={`rounded-xl px-3 py-2 text-xs font-extrabold transition ${
+                mode === 'register' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              สมัครบัญชี
+            </button>
           </div>
 
           <div className="mb-6 rounded-2xl border border-black/10 bg-slate-50 px-4 py-3">
@@ -135,6 +148,21 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
           </div>
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+            {mode === 'register' && (
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Display Name
+                </span>
+                <input
+                  value={values.displayName}
+                  onChange={(e) => setValues((prev) => ({ ...prev, displayName: e.target.value }))}
+                  disabled={loading}
+                  className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
+                  placeholder="ชื่อที่จะแสดงในระบบ"
+                />
+              </label>
+            )}
+
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Username
@@ -159,7 +187,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
                   onChange={(e) => setValues((prev) => ({ ...prev, password: e.target.value }))}
                   disabled={loading}
                   className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 pr-12 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
-                  placeholder="กรอกรหัสผ่าน"
+                  placeholder={mode === 'register' ? 'ตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร' : 'กรอกรหัสผ่าน'}
                 />
                 <button
                   type="button"
@@ -182,7 +210,13 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
               disabled={loading}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-amber-900/20 transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+              {loading
+                ? mode === 'register'
+                  ? 'กำลังสมัครบัญชี...'
+                  : 'กำลังเข้าสู่ระบบ...'
+                : mode === 'register'
+                  ? 'สมัครบัญชีและเข้าสู่ระบบ'
+                  : 'เข้าสู่ระบบ'}
               <ArrowRight className="h-4 w-4" />
             </button>
           </form>

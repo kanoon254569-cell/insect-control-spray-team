@@ -154,6 +154,24 @@ export default function App() {
     return response.json();
   };
 
+  const registerViaApi = async (values: { username: string; password: string; displayName: string; role: PortalRole }) => {
+    const response = await fetch('/api/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify(values)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'สมัครบัญชีไม่สำเร็จ');
+    }
+
+    return response.json();
+  };
+
   const handleLogin = async (values: { username: string; password: string; role: PortalRole }) => {
     setLoginLoading(true);
     setAuthError(null);
@@ -179,6 +197,37 @@ export default function App() {
       showToast(`ยินดีต้อนรับ ${result.displayName}`, 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ';
+      setAuthError(message);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleRegister = async (values: { username: string; password: string; displayName: string; role: PortalRole }) => {
+    setLoginLoading(true);
+    setAuthError(null);
+    try {
+      const result = await registerViaApi(values);
+      setSession({
+        role: result.role,
+        username: result.username,
+        displayName: result.displayName,
+        token: result.token
+      });
+      try {
+        await loadServerState();
+      } catch {
+        setProblems([]);
+        setBookings([]);
+        setContracts([]);
+        setJobs([]);
+        setInvoices([]);
+        setPackages(INITIAL_PACKAGES);
+      }
+      navigate(ROLE_TO_PATH[result.role], true);
+      showToast(`สมัครบัญชีและเข้าสู่ระบบสำเร็จ: ${result.displayName}`, 'success');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'สมัครบัญชีไม่สำเร็จ';
       setAuthError(message);
     } finally {
       setLoginLoading(false);
@@ -400,7 +449,7 @@ export default function App() {
     }
 
     return (
-      <LoginPage onLogin={handleLogin} loading={loginLoading} error={authError} />
+      <LoginPage onLogin={handleLogin} onRegister={handleRegister} loading={loginLoading} error={authError} />
     );
   }
 
