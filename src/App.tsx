@@ -12,7 +12,7 @@ const TechnicianPortal = lazy(() => import('./components/TechnicianPortal'));
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Seed & types
-import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember } from './types';
+import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember, TeamMemberRole } from './types';
 import { 
   INITIAL_PACKAGES 
 } from './data';
@@ -22,6 +22,7 @@ type AuthSession = {
   username: string;
   displayName: string;
   token: string;
+  teamRole?: TeamMemberRole;
 };
 
 type AppPath = '/login' | '/user' | '/technician' | '/customer';
@@ -81,7 +82,8 @@ export default function App() {
             role: data.role,
             username: data.username,
             displayName: data.displayName,
-            token: data.token
+            token: data.token,
+            teamRole: data.teamRole
           });
           try {
             await loadServerState();
@@ -191,7 +193,8 @@ export default function App() {
         role: result.role,
         username: result.username,
         displayName: result.displayName,
-        token: result.token
+        token: result.token,
+        teamRole: result.teamRole
       });
       try {
         await loadServerState();
@@ -223,7 +226,8 @@ export default function App() {
         role: result.role,
         username: result.username,
         displayName: result.displayName,
-        token: result.token
+        token: result.token,
+        teamRole: result.teamRole
       });
       try {
         await loadServerState();
@@ -602,6 +606,7 @@ export default function App() {
               {session.role === 'technician' && (
                 <TechnicianPortal
                   jobs={jobs}
+                  teamRole={session.teamRole}
                   onUpdateJobStatus={handleUpdateJobStatus}
                 />
               )}

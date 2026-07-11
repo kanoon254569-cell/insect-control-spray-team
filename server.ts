@@ -68,6 +68,7 @@ type SessionRow = {
   username: string;
   displayName: string;
   expiresAt: number;
+  teamRole?: TeamMemberRole;
 };
 
 type UserRow = {
@@ -208,7 +209,7 @@ async function requireSession(req: express.Request, res: express.Response) {
   return session;
 }
 
-async function createSession(role: PortalRole, username: string) {
+async function createSession(role: PortalRole, username: string, teamRole?: TeamMemberRole) {
   const sessionId = randomUUID();
   const user = await users.findOne({ username, role }, { projection: { _id: 0 } });
   const session: SessionRow = {
@@ -216,7 +217,8 @@ async function createSession(role: PortalRole, username: string) {
     role,
     username,
     displayName: user?.displayName ?? username,
-    expiresAt: Date.now() + SESSION_TTL_MS
+    expiresAt: Date.now() + SESSION_TTL_MS,
+    teamRole
   };
   await sessions.insertOne(session);
   return session;
@@ -336,7 +338,8 @@ app.get('/api/me', async (req, res) => {
     token: session.sessionId,
     role: session.role,
     username: session.username,
-    displayName: session.displayName
+    displayName: session.displayName,
+    teamRole: session.teamRole
   });
 });
 
@@ -355,9 +358,9 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
     }
     
-    // Create session for team member
+    // Create session for team member and preserve their team role
     const role = teamMember.role === 'team_lead' ? 'user' : 'technician';
-    const session = await createSession(role, normalizedUsername);
+    const session = await createSession(role, normalizedUsername, teamMember.role);
     res.setHeader(
       'Set-Cookie',
       serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -372,7 +375,8 @@ app.post('/api/login', async (req, res) => {
       token: session.sessionId,
       role: session.role,
       username: session.username,
-      displayName: session.displayName
+      displayName: session.displayName,
+      teamRole: session.teamRole
     });
   }
 
@@ -583,7 +587,12 @@ app.post('/api/jobs/assign', async (req, res) => {
 });
 
 app.patch('/api/jobs/:jobId/status', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
+  if (session.teamRole === 'team_member') {
+    return res.status(403).json({ message: 'สมาชิกทีมยังไม่สามารถส่งงานได้' });
+  }
+
   const { jobId } = req.params;
   const { status, updates } = req.body ?? {};
   if (!status) {

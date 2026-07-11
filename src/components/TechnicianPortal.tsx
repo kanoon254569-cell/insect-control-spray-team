@@ -14,15 +14,16 @@ import {
   Droplet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TechnicianJob, JobStatus } from '../types';
+import { TechnicianJob, JobStatus, TeamMemberRole } from '../types';
 import { PRESET_CHEMICALS } from '../data';
 
 interface TechnicianPortalProps {
   jobs: TechnicianJob[];
+  teamRole?: TeamMemberRole;
   onUpdateJobStatus: (jobId: string, status: JobStatus, updates?: Partial<TechnicianJob>) => Promise<void> | void;
 }
 
-export default function TechnicianPortal({ jobs, onUpdateJobStatus }: TechnicianPortalProps) {
+export default function TechnicianPortal({ jobs, teamRole, onUpdateJobStatus }: TechnicianPortalProps) {
   // Simulate active technician team
   const [selectedTeam, setSelectedTeam] = useState<string>('ทีมช่าง A (กรุงเทพฯ)');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -46,7 +47,13 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
     }
   };
 
+  const canUpdateJobs = teamRole !== 'team_member';
+
   const handleStatusChange = async (jobId: string, currentStatus: JobStatus) => {
+    if (!canUpdateJobs) {
+      alert('สมาชิกทีมยังไม่สามารถส่งงานหรืออัปเดตสถานะได้ กรุณาให้หัวหน้าทีมดำเนินการแทน');
+      return;
+    }
     let nextStatus: JobStatus;
     if (currentStatus === 'กำลังเตรียมตัว') nextStatus = 'กำลังเดินทาง';
     else if (currentStatus === 'กำลังเดินทาง') nextStatus = 'เริ่มดำเนินงาน';
@@ -236,29 +243,55 @@ export default function TechnicianPortal({ jobs, onUpdateJobStatus }: Technician
               {/* Status Action Buttons */}
               <div className="flex items-center space-x-2 shrink-0">
                 {activeJob.status !== 'ส่งงานแล้ว' && activeJob.status !== 'เสร็จสิ้นและตรวจรับ' ? (
-                  <button
-                    onClick={() => handleStatusChange(activeJob.id, activeJob.status)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
-                  >
-                    {activeJob.status === 'กำลังเตรียมตัว' && (
-                      <>
-                        <Truck className="w-3.5 h-3.5" />
-                        <span>กดเพื่อออกเดินทาง (On the Way)</span>
-                      </>
-                    )}
-                    {activeJob.status === 'กำลังเดินทาง' && (
-                      <>
-                        <Wrench className="w-3.5 h-3.5" />
-                        <span>กดเพื่อเริ่มปฎิบัติงานหน้างาน</span>
-                      </>
-                    )}
-                    {activeJob.status === 'เริ่มดำเนินงาน' && (
-                      <>
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>กรอกสารเคมีและอัปรูปเพื่อส่งงาน</span>
-                      </>
-                    )}
-                  </button>
+                  canUpdateJobs ? (
+                    <button
+                      onClick={() => handleStatusChange(activeJob.id, activeJob.status)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+                    >
+                      {activeJob.status === 'กำลังเตรียมตัว' && (
+                        <>
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>กดเพื่อออกเดินทาง (On the Way)</span>
+                        </>
+                      )}
+                      {activeJob.status === 'กำลังเดินทาง' && (
+                        <>
+                          <Wrench className="w-3.5 h-3.5" />
+                          <span>กดเพื่อเริ่มปฎิบัติงานหน้างาน</span>
+                        </>
+                      )}
+                      {activeJob.status === 'เริ่มดำเนินงาน' && (
+                        <>
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>กรอกสารเคมีและอัปรูปเพื่อส่งงาน</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="bg-slate-200 text-slate-500 font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-not-allowed border border-slate-200"
+                    >
+                      {activeJob.status === 'กำลังเตรียมตัว' && (
+                        <>
+                          <Truck className="w-3.5 h-3.5" />
+                          <span>กดเพื่อออกเดินทาง (On the Way)</span>
+                        </>
+                      )}
+                      {activeJob.status === 'กำลังเดินทาง' && (
+                        <>
+                          <Wrench className="w-3.5 h-3.5" />
+                          <span>กดเพื่อเริ่มปฎิบัติงานหน้างาน</span>
+                        </>
+                      )}
+                      {activeJob.status === 'เริ่มดำเนินงาน' && (
+                        <>
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>กรอกสารเคมีและอัปรูปเพื่อส่งงาน</span>
+                        </>
+                      )}
+                    </button>
+                  )
                 ) : (
                   <div className="flex items-center text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100 text-xs font-bold">
                     <CheckCircle className="w-4 h-4 mr-1.5 text-emerald-600" />
