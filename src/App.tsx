@@ -12,7 +12,7 @@ const TechnicianPortal = lazy(() => import('./components/TechnicianPortal'));
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Seed & types
-import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember, TeamMemberRole } from './types';
+import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember, TeamMemberRole, Team } from './types';
 import { 
   INITIAL_PACKAGES 
 } from './data';
@@ -23,6 +23,8 @@ type AuthSession = {
   displayName: string;
   token: string;
   teamRole?: TeamMemberRole;
+  teamId?: string;
+  teamName?: string;
 };
 
 type AppPath = '/login' | '/user' | '/technician' | '/customer';
@@ -55,6 +57,7 @@ export default function App() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [packages, setPackages] = useState(INITIAL_PACKAGES);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -83,7 +86,9 @@ export default function App() {
             username: data.username,
             displayName: data.displayName,
             token: data.token,
-            teamRole: data.teamRole
+            teamRole: data.teamRole,
+            teamId: data.teamId,
+            teamName: data.teamName
           });
           try {
             await loadServerState();
@@ -112,6 +117,7 @@ export default function App() {
 
   // Notifications or toast indicator state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [teamSuccessMessage, setTeamSuccessMessage] = useState<string | null>(null);
 
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
@@ -119,9 +125,10 @@ export default function App() {
   };
 
   const loadServerState = async () => {
-    const [stateRes, teamRes] = await Promise.all([
+    const [stateRes, teamRes, teamsRes] = await Promise.all([
       fetch('/api/state', { credentials: 'include' }),
-      fetch('/api/team-members', { credentials: 'include' })
+      fetch('/api/team-members', { credentials: 'include' }),
+      fetch('/api/teams', { credentials: 'include' })
     ]);
 
     if (!stateRes.ok) {
@@ -140,7 +147,11 @@ export default function App() {
       const teamData = await teamRes.json();
       setTeamMembers(teamData.members || []);
     }
-  };
+    if (teamsRes.ok) {
+      const teamsData = await teamsRes.json();
+      setTeams(teamsData.teams || []);
+    }
+  }
 
   const navigate = (path: AppPath, replace = false) => {
     const method = replace ? 'replaceState' : 'pushState';
@@ -194,7 +205,9 @@ export default function App() {
         username: result.username,
         displayName: result.displayName,
         token: result.token,
-        teamRole: result.teamRole
+        teamRole: result.teamRole,
+        teamId: result.teamId,
+        teamName: result.teamName
       });
       try {
         await loadServerState();
@@ -227,7 +240,9 @@ export default function App() {
         username: result.username,
         displayName: result.displayName,
         token: result.token,
-        teamRole: result.teamRole
+        teamRole: result.teamRole,
+        teamId: result.teamId,
+        teamName: result.teamName
       });
       try {
         await loadServerState();
@@ -440,7 +455,9 @@ export default function App() {
   };
 
   // 8. Admin: Add Team Member
-  const handleAddTeamMember = async (member: Omit<TeamMember, 'id' | 'createdAt'>) => {
+  type NewTeamMemberPayload = Omit<TeamMember, 'id' | 'createdAt'> & { password: string };
+
+  const handleAddTeamMember = async (member: NewTeamMemberPayload) => {
     const response = await fetch('/api/team-members', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -455,6 +472,40 @@ export default function App() {
 
     await loadServerState();
     showToast(`เพิ่ม ${member.name} เข้าทีมงานเรียบร้อย`);
+  };
+
+  const handleAddTeam = async (team: Omit<Team, 'id' | 'createdAt'>) => {
+    const response = await fetch('/api/teams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(team)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'สร้างทีมไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`สร้างทีม '${team.name}' สำเร็จ`);
+  };
+
+  const handleUpdateTeam = async (teamId: string, updates: Partial<Team>) => {
+    const response = await fetch(`/api/teams/${teamId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'อัปเดตทีมไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast('อัปเดตข้อมูลทีมสำเร็จ');
   };
 
   // 9. Admin: Update Team Member
@@ -607,6 +658,7 @@ export default function App() {
                 <TechnicianPortal
                   jobs={jobs}
                   teamRole={session.teamRole}
+                  teamName={session.teamName}
                   onUpdateJobStatus={handleUpdateJobStatus}
                 />
               )}
@@ -620,6 +672,7 @@ export default function App() {
                   invoices={invoices}
                   packages={packages}
                   teamMembers={teamMembers}
+                  teams={teams}
                   onAssignJob={handleAssignJob}
                   onAddInvoice={handleAddInvoice}
                   onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
@@ -627,6 +680,8 @@ export default function App() {
                   onAddTeamMember={handleAddTeamMember}
                   onUpdateTeamMember={handleUpdateTeamMember}
                   onDeleteTeamMember={handleDeleteTeamMember}
+                  onAddTeam={handleAddTeam}
+                  onUpdateTeam={handleUpdateTeam}
                 />
               )}
             </motion.div>

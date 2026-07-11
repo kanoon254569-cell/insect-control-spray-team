@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MapPin, 
   Phone, 
@@ -20,12 +20,12 @@ import { PRESET_CHEMICALS } from '../data';
 interface TechnicianPortalProps {
   jobs: TechnicianJob[];
   teamRole?: TeamMemberRole;
+  teamName?: string;
   onUpdateJobStatus: (jobId: string, status: JobStatus, updates?: Partial<TechnicianJob>) => Promise<void> | void;
 }
 
-export default function TechnicianPortal({ jobs, teamRole, onUpdateJobStatus }: TechnicianPortalProps) {
-  // Simulate active technician team
-  const [selectedTeam, setSelectedTeam] = useState<string>('ทีมช่าง A (กรุงเทพฯ)');
+export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJobStatus }: TechnicianPortalProps) {
+  const [selectedTeam, setSelectedTeam] = useState<string>(teamName || '');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   // Form states for submitting job report
@@ -34,6 +34,13 @@ export default function TechnicianPortal({ jobs, teamRole, onUpdateJobStatus }: 
   const [selectedPhoto, setSelectedPhoto] = useState<string>('');
   const [selectedPhotoName, setSelectedPhotoName] = useState<string>('');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+
+  React.useEffect(() => {
+    if (teamName) {
+      setSelectedTeam(teamName);
+      setSelectedJobId(null);
+    }
+  }, [teamName]);
 
   // Filter jobs by team
   const filteredJobs = jobs.filter(job => job.assignedTeam === selectedTeam);
@@ -150,11 +157,19 @@ export default function TechnicianPortal({ jobs, teamRole, onUpdateJobStatus }: 
               setSelectedTeam(e.target.value);
               setSelectedJobId(null);
             }}
-            className="w-full px-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-amber-500 text-slate-700"
+            disabled={!!teamName}
+            className="w-full px-3 py-2.5 text-xs font-semibold border border-slate-200 rounded-xl bg-slate-50 focus:ring-2 focus:ring-amber-500 text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
-            <option value="ทีมช่าง A (กรุงเทพฯ)">ทีมช่าง A (กรุงเทพฯ - ปริมณฑล)</option>
-            <option value="ทีมช่าง B (นนทบุรี)">ทีมช่าง B (นนทบุรี - ปทุมธานี)</option>
-            <option value="ทีมช่าง C (สมุทรปราการ)">ทีมช่าง C (สมุทรปราการ - ตะวันออก)</option>
+            {teamName ? (
+              <option value={teamName}>{teamName}</option>
+            ) : (
+              <>
+                <option value="">-- เลือกทีม --</option>
+                <option value="ทีมช่าง A (กรุงเทพฯ)">ทีมช่าง A (กรุงเทพฯ - ปริมณฑล)</option>
+                <option value="ทีมช่าง B (นนทบุรี)">ทีมช่าง B (นนทบุรี - ปทุมธานี)</option>
+                <option value="ทีมช่าง C (สมุทรปราการ)">ทีมช่าง C (สมุทรปราการ - ตะวันออก)</option>
+              </>
+            )}
           </select>
         </div>
 

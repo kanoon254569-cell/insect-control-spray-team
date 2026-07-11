@@ -24,7 +24,8 @@ import type {
   ServicePackage,
   TechnicianJob,
   TeamMember,
-  TeamMemberRole
+  TeamMemberRole,
+  Team
 } from './src/types';
 
 const app = express();
@@ -69,6 +70,8 @@ type SessionRow = {
   displayName: string;
   expiresAt: number;
   teamRole?: TeamMemberRole;
+  teamId?: string;
+  teamName?: string;
 };
 
 type UserRow = {
@@ -85,6 +88,7 @@ type JobDocument = TechnicianJob & { createdAt: string };
 const users = database.collection<UserRow>('users');
 const sessions = database.collection<SessionRow>('sessions');
 const teamMembersCollection = database.collection<TeamMember>('teamMembers');
+const teamsCollection = database.collection<Team>('teams');
 const packagesCollection = database.collection<ServicePackage>('packages');
 const problemsCollection = database.collection<PestProblem>('problems');
 const bookingsCollection = database.collection<Booking>('bookings');
@@ -170,6 +174,8 @@ async function createIndexes() {
     sessions.createIndex({ sessionId: 1 }, { unique: true }),
     sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     teamMembersCollection.createIndex({ id: 1 }, { unique: true }),
+    teamsCollection.createIndex({ id: 1 }, { unique: true }),
+    teamsCollection.createIndex({ name: 1 }, { unique: true }),
     packagesCollection.createIndex({ id: 1 }, { unique: true }),
     problemsCollection.createIndex({ id: 1 }, { unique: true }),
     bookingsCollection.createIndex({ id: 1 }, { unique: true }),
@@ -209,7 +215,7 @@ async function requireSession(req: express.Request, res: express.Response) {
   return session;
 }
 
-async function createSession(role: PortalRole, username: string, teamRole?: TeamMemberRole) {
+async function createSession(role: PortalRole, username: string, teamRole?: TeamMemberRole, teamId?: string, teamName?: string) {
   const sessionId = randomUUID();
   const user = await users.findOne({ username, role }, { projection: { _id: 0 } });
   const session: SessionRow = {
@@ -218,7 +224,9 @@ async function createSession(role: PortalRole, username: string, teamRole?: Team
     username,
     displayName: user?.displayName ?? username,
     expiresAt: Date.now() + SESSION_TTL_MS,
-    teamRole
+    teamRole,
+    teamId,
+    teamName
   };
   await sessions.insertOne(session);
   return session;
@@ -339,7 +347,9 @@ app.get('/api/me', async (req, res) => {
     role: session.role,
     username: session.username,
     displayName: session.displayName,
-    teamRole: session.teamRole
+    teamRole: session.teamRole,
+    teamId: session.teamId,
+    teamName: session.teamName
   });
 });
 
@@ -358,9 +368,9 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
     }
     
-    // Create session for team member and preserve their team role
+    // Create session for team member and preserve their team role and team assignment
     const role = teamMember.role === 'team_lead' ? 'user' : 'technician';
-    const session = await createSession(role, normalizedUsername, teamMember.role);
+    const session = await createSession(role, normalizedUsername, teamMember.role, teamMember.teamId, teamMember.teamName);
     res.setHeader(
       'Set-Cookie',
       serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -376,7 +386,9 @@ app.post('/api/login', async (req, res) => {
       role: session.role,
       username: session.username,
       displayName: session.displayName,
-      teamRole: session.teamRole
+      teamRole: session.teamRole,
+      teamId: session.teamId,
+      teamName: session.teamName
     });
   }
 
@@ -471,8 +483,24 @@ app.post('/api/logout', async (req, res) => {
 });
 
 app.get('/api/state', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
-  return res.json(await getState());
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  const state = await getState();
+
+  if (session.teamRole === 'team_member' || session.teamRole === 'team_lead') {
+    const filteredJobs = state.jobs.filter((job) => job.assignedTeam === session.teamName);
+    return res.json({
+      problems: state.problems,
+      bookings: state.bookings,
+      contracts: state.contracts,
+      jobs: filteredJobs,
+      invoices: state.invoices,
+      packages: state.packages
+    });
+  }
+
+  return res.json(state);
 });
 
 app.post('/api/problems', async (req, res) => {
@@ -704,16 +732,90 @@ app.patch('/api/invoices/:invoiceId/status', async (req, res) => {
 
 // Team Members Management APIs
 app.get('/api/team-members', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
-  const members = await teamMembersCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  const query: Record<string, unknown> = {};
+  if (session.teamRole === 'team_member' || session.teamRole === 'team_lead') {
+    if (session.teamId) {
+      query.teamId = session.teamId;
+    } else {
+      // If team member exists without a team, return empty list
+      return res.json({ members: [] });
+    }
+  }
+
+  const members = await teamMembersCollection.find(query, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
   return res.json({ members });
+});
+
+app.get('/api/teams', async (req, res) => {
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  const query: Record<string, unknown> = {};
+  if (session.teamRole === 'team_member' || session.teamRole === 'team_lead') {
+    if (session.teamId) {
+      query.id = session.teamId;
+    } else {
+      return res.json({ teams: [] });
+    }
+  }
+
+  const teams = await teamsCollection.find(query, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray();
+  return res.json({ teams });
+});
+
+app.post('/api/teams', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { name, description } = req.body ?? {};
+
+  if (!name) {
+    return res.status(400).json({ message: 'กรุณากรอกชื่อทีม' });
+  }
+
+  const existing = await teamsCollection.findOne({ name });
+  if (existing) {
+    return res.status(409).json({ message: 'มีทีมชื่อเดียวกันแล้ว' });
+  }
+
+  const teamCount = await dbCount(teamsCollection);
+  const team: Team = {
+    id: makeId('team', 100, teamCount),
+    name,
+    description,
+    createdAt: new Date().toISOString()
+  };
+
+  await teamsCollection.insertOne(team);
+  return res.status(201).json({ team });
+});
+
+app.patch('/api/teams/:teamId', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { teamId } = req.params;
+  const { name, description } = req.body ?? {};
+
+  if (!name && !description) {
+    return res.status(400).json({ message: 'ไม่มีข้อมูลที่จะอัปเดต' });
+  }
+
+  if (name) {
+    const existing = await teamsCollection.findOne({ name, id: { $ne: teamId } });
+    if (existing) {
+      return res.status(409).json({ message: 'มีทีมชื่อเดียวกันแล้ว' });
+    }
+  }
+
+  await teamsCollection.updateOne({ id: teamId }, { $set: { ...(name ? { name } : {}), ...(description ? { description } : {}) } });
+  return res.json({ ok: true });
 });
 
 app.post('/api/team-members', async (req, res) => {
   if (!(await requireSession(req, res))) return;
-  const { name, phone, email, username, password, role, status } = req.body ?? {};
+  const { name, phone, email, username, password, role, status, teamId, teamName } = req.body ?? {};
 
-  if (!name || !phone || !email || !username || !password || !role) {
+  if (!name || !phone || !email || !username || !password || !role || !teamId || !teamName) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลทั้งหมด' });
   }
 
@@ -744,6 +846,8 @@ app.post('/api/team-members', async (req, res) => {
     username: username.toLowerCase(),
     passwordHash: hashPassword(password),
     role,
+    teamId,
+    teamName,
     createdAt: new Date().toISOString(),
     status: 'active'
   };
@@ -755,12 +859,14 @@ app.post('/api/team-members', async (req, res) => {
 app.patch('/api/team-members/:memberId', async (req, res) => {
   if (!(await requireSession(req, res))) return;
   const { memberId } = req.params;
-  const { name, phone, email, password, role, status } = req.body ?? {};
+  const { name, phone, email, password, role, status, teamId, teamName } = req.body ?? {};
 
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
   if (phone) updateData.phone = phone;
   if (email) updateData.email = email;
+  if (teamId) updateData.teamId = teamId;
+  if (teamName) updateData.teamName = teamName;
   if (password) {
     if (password.length < 6) {
       return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });

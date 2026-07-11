@@ -12,8 +12,17 @@ export interface TeamMember {
   username: string;
   passwordHash?: string;
   role: TeamMemberRole;
+  teamId?: string;
+  teamName?: string;
   createdAt: string;
   status: 'active' | 'inactive';
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
 }
 
 export interface PestProblem {

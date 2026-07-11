@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building, 
   TrendingUp, 
@@ -27,7 +27,9 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice, TeamMember, TeamMemberRole } from '../types';
+import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice, TeamMember, TeamMemberRole, Team } from '../types';
+
+type NewTeamMemberPayload = Omit<TeamMember, 'id' | 'createdAt'> & { password: string };
 
 interface AdminPortalProps {
   problems: PestProblem[];
@@ -37,13 +39,16 @@ interface AdminPortalProps {
   invoices: Invoice[];
   packages: ServicePackage[];
   teamMembers: TeamMember[];
+  teams: Team[];
   onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking', teamName: string, date: string, title: string, desc: string) => Promise<void> | void;
   onAddInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNo' | 'createdAt'>) => Promise<void> | void;
   onUpdateInvoiceStatus: (invoiceId: string, status: 'ค้างชำระ' | 'ชำระเงินแล้ว') => Promise<void> | void;
   onApproveJobCompletion: (jobId: string) => Promise<void> | void;
-  onAddTeamMember: (member: Omit<TeamMember, 'id' | 'createdAt'>) => Promise<void> | void;
-  onUpdateTeamMember: (memberId: string, updates: Partial<TeamMember>) => Promise<void> | void;
+  onAddTeamMember: (member: NewTeamMemberPayload) => Promise<void> | void;
+  onUpdateTeamMember: (memberId: string, updates: Partial<TeamMember> & { password?: string }) => Promise<void> | void;
   onDeleteTeamMember: (memberId: string) => Promise<void> | void;
+  onAddTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void> | void;
+  onUpdateTeam: (teamId: string, updates: Partial<Team>) => Promise<void> | void;
 }
 
 export default function AdminPortal({
@@ -54,22 +59,31 @@ export default function AdminPortal({
   invoices,
   packages,
   teamMembers,
+  teams,
   onAssignJob,
   onAddInvoice,
   onUpdateInvoiceStatus,
   onApproveJobCompletion,
   onAddTeamMember,
   onUpdateTeamMember,
-  onDeleteTeamMember
+  onDeleteTeamMember,
+  onAddTeam,
+  onUpdateTeam
 }: AdminPortalProps) {
   const [adminTab, setAdminTab] = useState<'dashboard' | 'assignments' | 'billing' | 'history' | 'team'>('dashboard');
 
   // Dispatch/Scheduling form states
   const [selectedSourceId, setSelectedSourceId] = useState<string>('');
   const [selectedSourceType, setSelectedSourceType] = useState<'problem' | 'booking'>('problem');
-  const [assignedTeam, setAssignedTeam] = useState<string>('ทีมช่าง A (กรุงเทพฯ)');
+  const [assignedTeam, setAssignedTeam] = useState<string>('');
   const [appointmentDate, setAppointmentDate] = useState<string>('');
   const [dispatchSuccess, setDispatchSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!assignedTeam && teams.length > 0) {
+      setAssignedTeam(teams[0].name);
+    }
+  }, [teams, assignedTeam]);
 
   // Invoice creator form states
   const [invoiceForm, setInvoiceForm] = useState({
@@ -89,11 +103,17 @@ export default function AdminPortal({
     email: '',
     username: '',
     password: '',
-    role: 'team_member' as TeamMemberRole
+    role: 'team_member' as TeamMemberRole,
+    teamId: '',
+    teamName: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [teamSuccess, setTeamSuccess] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+
+  const [teamSectionForm, setTeamSectionForm] = useState({ name: '', description: '' });
+  const [teamSectionSuccess, setTeamSectionSuccess] = useState(false);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -444,9 +464,16 @@ export default function AdminPortal({
                     onChange={e => setAssignedTeam(e.target.value)}
                     className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 text-slate-700"
                   >
-                    <option value="ทีมช่าง A (กรุงเทพฯ)">ทีมช่าง A (กรุงเทพฯ - ปริมณฑล)</option>
-                    <option value="ทีมช่าง B (นนทบุรี)">ทีมช่าง B (นนทบุรี - ปทุมธานี)</option>
-                    <option value="ทีมช่าง C (สมุทรปราการ)">ทีมช่าง C (สมุทรปราการ - ฝั่งตะวันออก)</option>
+                    <option value="">-- เลือกทีม --</option>
+                    {teams.length === 0 ? (
+                      <option value="" disabled>ยังไม่มีทีม กรุณาสร้างทีมก่อน</option>
+                    ) : (
+                      teams.map((team) => (
+                        <option key={team.id} value={team.name}>
+                          {team.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -886,156 +913,314 @@ export default function AdminPortal({
       {/* TAB 5: TEAM MANAGEMENT */}
       {adminTab === 'team' && (
         <div className="space-y-6">
-          {/* Add/Edit Team Member Form */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
-            <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-amber-600" />
-              {editingMemberId ? 'แก้ไขสมาชิกทีมงาน' : 'เพิ่มสมาชิกทีมงานใหม่'}
-            </h3>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Team Creation / Edit Section */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+                <Users className="w-4 h-4 text-amber-600" />
+                {editingTeamId ? 'แก้ไขข้อมูลทีม' : 'สร้างทีมใหม่'}
+              </h3>
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              if (!teamForm.name || !teamForm.phone || !teamForm.email || !teamForm.username) {
-                alert('กรุณากรอกข้อมูลทั้งหมด');
-                return;
-              }
-              if (!editingMemberId && !teamForm.password) {
-                alert('กรุณากรอกรหัสผ่าน');
-                return;
-              }
-              if (!editingMemberId && teamForm.password.length < 6) {
-                alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
-                return;
-              }
-              try {
-                if (editingMemberId) {
-                  const updateData = {
-                    name: teamForm.name,
-                    phone: teamForm.phone,
-                    email: teamForm.email,
-                    role: teamForm.role,
-                    ...(teamForm.password && { password: teamForm.password })
-                  };
-                  await onUpdateTeamMember(editingMemberId, updateData);
-                  setEditingMemberId(null);
-                } else {
-                  await onAddTeamMember({ ...teamForm, status: 'active' });
-                }
-                setTeamSuccess(true);
-                setTimeout(() => setTeamSuccess(false), 2000);
-                setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member' });
-              } catch {
-                alert('บันทึกข้อมูลไม่สำเร็จ');
-              }
-            }} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!teamSectionForm.name) {
+                    alert('กรุณากรอกชื่อทีม');
+                    return;
+                  }
+                  try {
+                    if (editingTeamId) {
+                      await onUpdateTeam(editingTeamId, {
+                        name: teamSectionForm.name,
+                        description: teamSectionForm.description
+                      });
+                      setEditingTeamId(null);
+                    } else {
+                      await onAddTeam({
+                        name: teamSectionForm.name,
+                        description: teamSectionForm.description
+                      });
+                    }
+                    setTeamSectionSuccess(true);
+                    setTimeout(() => setTeamSectionSuccess(false), 2000);
+                    setTeamSectionForm({ name: '', description: '' });
+                  } catch {
+                    alert('บันทึกข้อมูลทีมไม่สำเร็จ');
+                  }
+                }}
+                className="space-y-4"
+              >
                 <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ชื่อ-นามสกุล</span>
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ชื่อทีม</span>
                   <input
-                    value={teamForm.name}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, name: e.target.value }))}
+                    value={teamSectionForm.name}
+                    onChange={(e) => setTeamSectionForm((prev) => ({ ...prev, name: e.target.value }))}
                     required
                     className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
-                    placeholder="เช่น สมชาย ใจกระเด้"
+                    placeholder="เช่น ทีมช่าง A (กรุงเทพฯ)"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">เบอร์โทรศัพท์</span>
-                  <input
-                    value={teamForm.phone}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, phone: e.target.value }))}
-                    required
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">รายละเอียดทีม (ไม่บังคับ)</span>
+                  <textarea
+                    value={teamSectionForm.description}
+                    onChange={(e) => setTeamSectionForm((prev) => ({ ...prev, description: e.target.value }))}
+                    rows={3}
                     className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
-                    placeholder="เช่น 081-234-5678"
+                    placeholder="เช่น ดูแลพื้นที่กรุงเทพฝั่งตะวันตกและปริมณฑล"
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">อีเมล</span>
-                  <input
-                    type="email"
-                    value={teamForm.email}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
-                    placeholder="example@mail.com"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">บทบาท</span>
-                  <select
-                    value={teamForm.role}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, role: e.target.value as TeamMemberRole }))}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
                   >
-                    <option value="team_lead">หัวหน้าทีม (Team Lead) - ดูทุกข้อมูล + ส่งงาน</option>
-                    <option value="team_member">สมาชิกทีม (Team Member) - ดูปัญหา + เวลางาน เท่านั้น</option>
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Username (ชื่อผู้ใช้)</span>
-                  <input
-                    value={teamForm.username}
-                    onChange={(e) => setTeamForm(prev => ({ ...prev, username: e.target.value }))}
-                    required
-                    disabled={!!editingMemberId}
-                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:text-slate-400"
-                    placeholder="เช่น dasd (ใช้สำหรับเข้าสู่ระบบ)"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">รหัสผ่าน {editingMemberId && '(ว่างไว้ = ไม่เปลี่ยน)'}</span>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={teamForm.password}
-                      onChange={(e) => setTeamForm(prev => ({ ...prev, password: e.target.value }))}
-                      required={!editingMemberId}
-                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 pr-12 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
-                      placeholder={editingMemberId ? 'ว่างไว้เพื่อไม่เปลี่ยนรหัสผ่าน' : 'อย่างน้อย 6 ตัวอักษร'}
-                    />
+                    {editingTeamId ? 'อัปเดตทีม' : 'สร้างทีมใหม่'}
+                  </button>
+                  {editingTeamId && (
                     <button
                       type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                      onClick={() => {
+                        setEditingTeamId(null);
+                        setTeamSectionForm({ name: '', description: '' });
+                      }}
+                      className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition"
                     >
-                      {showPassword ? '🙈' : '👁️'}
+                      ยกเลิก
                     </button>
-                  </div>
-                </label>
-              </div>
+                  )}
+                </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="submit"
-                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
-                >
-                  {editingMemberId ? 'อัปเดตข้อมูล' : 'เพิ่มสมาชิกใหม่'}
-                </button>
-                {editingMemberId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingMemberId(null);
-                      setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member' });
-                    }}
-                    className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition"
-                  >
-                    ยกเลิก
-                  </button>
+                {teamSectionSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold">
+                    ✓ บันทึกข้อมูลทีมสำเร็จ
+                  </div>
+                )}
+              </form>
+
+              <div className="mt-6">
+                <h4 className="text-xs font-bold uppercase tracking-[0.22em] text-slate-400 mb-3">ทีมที่สร้างไว้</h4>
+                {teams.length === 0 ? (
+                  <p className="text-xs text-slate-500">ยังไม่มีทีม กรุณาสร้างทีมก่อนเพิ่มสมาชิก</p>
+                ) : (
+                  <div className="space-y-3">
+                    {teams.map((team) => (
+                      <div key={team.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3 flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-800">{team.name}</div>
+                          <div className="text-[11px] text-slate-500 mt-1">{team.description || 'ไม่มีรายละเอียดเพิ่มเติม'}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTeamId(team.id);
+                            setTeamSectionForm({ name: team.name, description: team.description || '' });
+                          }}
+                          className="text-[10px] font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full"
+                        >
+                          แก้ไขทีม
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
+            </div>
 
-              {teamSuccess && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold">
-                  ✓ บันทึกข้อมูลสำเร็จ
+            {/* Add/Edit Team Member Form */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
+              <h3 className="text-sm font-extrabold text-slate-800 mb-4 flex items-center gap-2">
+                <PlusCircle className="w-4 h-4 text-amber-600" />
+                {editingMemberId ? 'แก้ไขสมาชิกทีมงาน' : 'เพิ่มสมาชิกทีมงานใหม่'}
+              </h3>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!teamForm.name || !teamForm.phone || !teamForm.email || !teamForm.username || !teamForm.teamId) {
+                    alert('กรุณากรอกข้อมูลทั้งหมดและเลือกทีม');
+                    return;
+                  }
+                  if (!editingMemberId && !teamForm.password) {
+                    alert('กรุณากรอกรหัสผ่าน');
+                    return;
+                  }
+                  if (!editingMemberId && teamForm.password.length < 6) {
+                    alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+                    return;
+                  }
+                  try {
+                    if (editingMemberId) {
+                      const updateData: Partial<TeamMember> & { password?: string } = {
+                        name: teamForm.name,
+                        phone: teamForm.phone,
+                        email: teamForm.email,
+                        role: teamForm.role,
+                        teamId: teamForm.teamId,
+                        teamName: teamForm.teamName
+                      };
+                      if (teamForm.password) {
+                        updateData.password = teamForm.password;
+                      }
+                      await onUpdateTeamMember(editingMemberId, updateData);
+                      setEditingMemberId(null);
+                    } else {
+                      await onAddTeamMember({
+                        name: teamForm.name,
+                        phone: teamForm.phone,
+                        email: teamForm.email,
+                        username: teamForm.username,
+                        password: teamForm.password,
+                        role: teamForm.role,
+                        teamId: teamForm.teamId,
+                        teamName: teamForm.teamName,
+                        status: 'active'
+                      });
+                    }
+                    setTeamSuccess(true);
+                    setTimeout(() => setTeamSuccess(false), 2000);
+                    setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member', teamId: '', teamName: '' });
+                  } catch {
+                    alert('บันทึกข้อมูลไม่สำเร็จ');
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ชื่อ-นามสกุล</span>
+                    <input
+                      value={teamForm.name}
+                      onChange={(e) => setTeamForm((prev) => ({ ...prev, name: e.target.value }))}
+                      required
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                      placeholder="เช่น สมชาย ใจกระเด้"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">เบอร์โทรศัพท์</span>
+                    <input
+                      value={teamForm.phone}
+                      onChange={(e) => setTeamForm((prev) => ({ ...prev, phone: e.target.value }))}
+                      required
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                      placeholder="เช่น 081-234-5678"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">อีเมล</span>
+                    <input
+                      type="email"
+                      value={teamForm.email}
+                      onChange={(e) => setTeamForm((prev) => ({ ...prev, email: e.target.value }))}
+                      required
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                      placeholder="example@mail.com"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">ทีมที่มอบหมาย</span>
+                    <select
+                      value={teamForm.teamId}
+                      onChange={(e) => {
+                        const selected = teams.find((team) => team.id === e.target.value);
+                        setTeamForm((prev) => ({
+                          ...prev,
+                          teamId: selected?.id || '',
+                          teamName: selected?.name || ''
+                        }));
+                      }}
+                      required
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                    >
+                      <option value="">-- เลือกทีม --</option>
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">บทบาท</span>
+                    <select
+                      value={teamForm.role}
+                      onChange={(e) => setTeamForm((prev) => ({ ...prev, role: e.target.value as TeamMemberRole }))}
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                    >
+                      <option value="team_lead">หัวหน้าทีม (Team Lead) - ดูทุกข้อมูล + ส่งงาน</option>
+                      <option value="team_member">สมาชิกทีม (Team Member) - ดูปัญหา + เวลางาน เท่านั้น</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Username (ชื่อผู้ใช้)</span>
+                    <input
+                      value={teamForm.username}
+                      onChange={(e) => setTeamForm((prev) => ({ ...prev, username: e.target.value }))}
+                      required
+                      disabled={!!editingMemberId}
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:text-slate-400"
+                      placeholder="เช่น dasd (ใช้สำหรับเข้าสู่ระบบ)"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">รหัสผ่าน {editingMemberId && '(ว่างไว้ = ไม่เปลี่ยน)'}</span>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={teamForm.password}
+                        onChange={(e) => setTeamForm((prev) => ({ ...prev, password: e.target.value }))}
+                        required={!editingMemberId}
+                        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 pr-12 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                        placeholder={editingMemberId ? 'ว่างไว้เพื่อไม่เปลี่ยนรหัสผ่าน' : 'อย่างน้อย 6 ตัวอักษร'}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                      >
+                        {showPassword ? '🙈' : '👁️'}
+                      </button>
+                    </div>
+                  </label>
                 </div>
-              )}
-            </form>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
+                  >
+                    {editingMemberId ? 'อัปเดตข้อมูล' : 'เพิ่มสมาชิกใหม่'}
+                  </button>
+                  {editingMemberId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingMemberId(null);
+                        setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member', teamId: '', teamName: '' });
+                      }}
+                      className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition"
+                    >
+                      ยกเลิก
+                    </button>
+                  )}
+                </div>
+
+                {teamSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-xs font-semibold">
+                    ✓ บันทึกข้อมูลสำเร็จ
+                  </div>
+                )}
+              </form>
+            </div>
           </div>
 
           {/* Team Members List */}
@@ -1052,6 +1237,7 @@ export default function AdminPortal({
                       <th className="p-3">ชื่อ-นามสกุล</th>
                       <th className="p-3">เบอร์โทร</th>
                       <th className="p-3">อีเมล</th>
+                      <th className="p-3">ทีม</th>
                       <th className="p-3">บทบาท</th>
                       <th className="p-3">สถานะ</th>
                       <th className="p-3">จัดการ</th>
@@ -1063,26 +1249,20 @@ export default function AdminPortal({
                         <td className="p-3 font-semibold text-slate-800">{member.name}</td>
                         <td className="p-3 font-mono text-slate-600">{member.phone}</td>
                         <td className="p-3 text-slate-600">{member.email}</td>
+                        <td className="p-3 text-slate-600">{member.teamName || '-'}</td>
                         <td className="p-3">
-                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${
-                            member.role === 'team_lead'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-slate-100 text-slate-800'
-                          }`}>
+                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${member.role === 'team_lead' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'}`}>
                             {member.role === 'team_lead' ? 'หัวหน้าทีม' : 'สมาชิกทีม'}
                           </span>
                         </td>
                         <td className="p-3">
-                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${
-                            member.status === 'active'
-                              ? 'bg-emerald-100 text-emerald-800'
-                              : 'bg-rose-100 text-rose-800'
-                          }`}>
+                          <span className={`inline-block px-2 py-1 rounded-full text-[9px] font-bold ${member.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                             {member.status === 'active' ? 'ใช้งาน' : 'ปิดใช้งาน'}
                           </span>
                         </td>
                         <td className="p-3 flex gap-2">
                           <button
+                            type="button"
                             onClick={() => {
                               setEditingMemberId(member.id);
                               setTeamForm({
@@ -1091,7 +1271,9 @@ export default function AdminPortal({
                                 email: member.email,
                                 username: member.username,
                                 password: '',
-                                role: member.role
+                                role: member.role,
+                                teamId: member.teamId || '',
+                                teamName: member.teamName || ''
                               });
                             }}
                             className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded text-[9px]"
@@ -1099,6 +1281,7 @@ export default function AdminPortal({
                             แก้ไข
                           </button>
                           <button
+                            type="button"
                             onClick={async () => {
                               if (confirm(`คุณแน่ใจที่จะลบ ${member.name} ออกจากระบบหรือไม่?`)) {
                                 try {
@@ -1145,7 +1328,6 @@ export default function AdminPortal({
           </div>
         </div>
       )}
-
       {/* JOB REPORT DETAIL MODAL */}
       {viewJob && (
         <div className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center z-50 p-4">
