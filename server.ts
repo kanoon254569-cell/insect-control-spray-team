@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
-import initSqlJs from 'sql.js';
+import mysql, { Pool, PoolConnection } from 'mysql2/promise';
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -29,21 +30,22 @@ const port = Number(process.env.PORT ?? 8787);
 const host = '0.0.0.0';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.join(__dirname, 'data');
-const dbPath = path.join(dataDir, 'bugguard.sqlite');
-const sqlJsDistDir = path.join(__dirname, 'node_modules', 'sql.js', 'dist');
 const SESSION_COOKIE = 'bugguard_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
-mkdirSync(dataDir, { recursive: true });
-
-const SQL = await initSqlJs({
-  locateFile: (file) => path.join(sqlJsDistDir, file)
-});
-
-const database = existsSync(dbPath)
-  ? new SQL.Database(new Uint8Array(readFileSync(dbPath)))
-  : new SQL.Database();
+const databaseUrl = process.env.MYSQL_URL ?? process.env.DATABASE_URL;
+const pool = databaseUrl
+  ? mysql.createPool(databaseUrl)
+  : mysql.createPool({
+      host: process.env.MYSQL_HOST ?? 'localhost',
+      port: Number(process.env.MYSQL_PORT ?? 3306),
+      user: process.env.MYSQL_USER ?? 'root',
+      password: process.env.MYSQL_PASSWORD ?? '',
+      database: process.env.MYSQL_DATABASE ?? 'insect_control_spray_team',
+      waitForConnections: true,
+      connectionLimit: 10,
+      charset: 'utf8mb4'
+    });
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -59,6 +61,8 @@ type SessionRow = {
   displayName: string;
   expiresAt: number;
 };
+
+type QueryRunner = Pool | PoolConnection;
 
 function serializeCookie(
   name: string,
@@ -83,41 +87,32 @@ function parseCookies(header = '') {
   }, {});
 }
 
-function queryAll<T = Record<string, unknown>>(sql: string, params: unknown[] = []): T[] {
-  const statement = database.prepare(sql);
-  statement.bind(params);
-  const rows: T[] = [];
-  while (statement.step()) {
-    rows.push(statement.getAsObject() as T);
-  }
-  statement.free();
-  return rows;
+async function queryAll<T = Record<string, unknown>>(sql: string, params: unknown[] = [], runner: QueryRunner = pool): Promise<T[]> {
+  const [rows] = await runner.execute(sql, params as Parameters<QueryRunner['execute']>[1]);
+  return rows as T[];
 }
 
-function queryOne<T = Record<string, unknown>>(sql: string, params: unknown[] = []): T | null {
-  return queryAll<T>(sql, params)[0] ?? null;
+async function queryOne<T = Record<string, unknown>>(sql: string, params: unknown[] = [], runner: QueryRunner = pool): Promise<T | null> {
+  const rows = await queryAll<T>(sql, params, runner);
+  return rows[0] ?? null;
 }
 
-function execute(sql: string, params: unknown[] = []) {
-  const statement = database.prepare(sql);
-  statement.run(params);
-  statement.free();
+async function execute(sql: string, params: unknown[] = [], runner: QueryRunner = pool) {
+  await runner.execute(sql, params as Parameters<QueryRunner['execute']>[1]);
 }
 
-function persistDb() {
-  writeFileSync(dbPath, Buffer.from(database.export()));
-}
-
-function transaction<T>(fn: () => T): T {
-  execute('BEGIN');
+async function transaction<T>(fn: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  const connection = await pool.getConnection();
   try {
-    const result = fn();
-    execute('COMMIT');
-    persistDb();
+    await connection.beginTransaction();
+    const result = await fn(connection);
+    await connection.commit();
     return result;
   } catch (error) {
-    execute('ROLLBACK');
+    await connection.rollback();
     throw error;
+  } finally {
+    connection.release();
   }
 }
 
@@ -130,6 +125,7 @@ function optionalString(value: unknown) {
 }
 
 function parseJsonArray<T>(value: unknown, fallback: T[] = []): T[] {
+  if (Array.isArray(value)) return value as T[];
   if (typeof value !== 'string' || value.length === 0) return fallback;
   try {
     const parsed = JSON.parse(value);
@@ -237,36 +233,36 @@ function toPackage(row: Record<string, unknown>): ServicePackage {
   };
 }
 
-function dbCount(table: string) {
-  const row = queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM ${table}`);
+async function dbCount(table: string, runner: QueryRunner = pool) {
+  const row = await queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM ${table}`, [], runner);
   return Number(row?.count ?? 0);
 }
 
-function createSchema() {
-  execute(
-    'CREATE TABLE IF NOT EXISTS sessions (session_id TEXT PRIMARY KEY, role TEXT NOT NULL, username TEXT NOT NULL, display_name TEXT NOT NULL, expires_at INTEGER NOT NULL)'
+async function createSchema() {
+  await execute(
+    'CREATE TABLE IF NOT EXISTS sessions (sessionId VARCHAR(64) PRIMARY KEY, role VARCHAR(32) NOT NULL, username VARCHAR(255) NOT NULL, displayName VARCHAR(255) NOT NULL, expiresAt BIGINT NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, name TEXT NOT NULL, price INTEGER NOT NULL, duration TEXT NOT NULL, description TEXT NOT NULL, guarantee TEXT NOT NULL, features TEXT NOT NULL)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS packages (id VARCHAR(64) PRIMARY KEY, name TEXT NOT NULL, price INT NOT NULL, duration TEXT NOT NULL, description TEXT NOT NULL, guarantee TEXT NOT NULL, features JSON NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS problems (id TEXT PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, pestType TEXT NOT NULL, description TEXT NOT NULL, urgency TEXT NOT NULL, createdAt TEXT NOT NULL, status TEXT NOT NULL, assignedTeam TEXT, appointmentDate TEXT)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS problems (id VARCHAR(64) PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, pestType VARCHAR(64) NOT NULL, description TEXT NOT NULL, urgency VARCHAR(64) NOT NULL, createdAt VARCHAR(64) NOT NULL, status VARCHAR(64) NOT NULL, assignedTeam TEXT, appointmentDate VARCHAR(64)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS bookings (id TEXT PRIMARY KEY, packageId TEXT NOT NULL, packageName TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, bookingDate TEXT NOT NULL, price INTEGER NOT NULL, status TEXT NOT NULL, invoiceNo TEXT)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS bookings (id VARCHAR(64) PRIMARY KEY, packageId VARCHAR(64) NOT NULL, packageName TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, bookingDate VARCHAR(64) NOT NULL, price INT NOT NULL, status VARCHAR(64) NOT NULL, invoiceNo VARCHAR(64)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS contracts (id TEXT PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, packageName TEXT NOT NULL, startDate TEXT NOT NULL, endDate TEXT NOT NULL, totalVisits INTEGER NOT NULL, completedVisits INTEGER NOT NULL, nextVisitDate TEXT NOT NULL, price INTEGER NOT NULL, status TEXT NOT NULL, documentNo TEXT NOT NULL)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS contracts (id VARCHAR(64) PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, packageName TEXT NOT NULL, startDate VARCHAR(64) NOT NULL, endDate VARCHAR(64) NOT NULL, totalVisits INT NOT NULL, completedVisits INT NOT NULL, nextVisitDate VARCHAR(64) NOT NULL, price INT NOT NULL, status VARCHAR(64) NOT NULL, documentNo VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, sourceId TEXT NOT NULL, sourceType TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, appointmentDate TEXT NOT NULL, assignedTeam TEXT NOT NULL, status TEXT NOT NULL, notesByTech TEXT, imageReport TEXT, chemicalsUsed TEXT, completedAt TEXT, createdAt TEXT NOT NULL)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS jobs (id VARCHAR(64) PRIMARY KEY, sourceId VARCHAR(64) NOT NULL, sourceType VARCHAR(32) NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, appointmentDate VARCHAR(64) NOT NULL, assignedTeam TEXT NOT NULL, status VARCHAR(64) NOT NULL, notesByTech TEXT, imageReport LONGTEXT, chemicalsUsed JSON, completedAt VARCHAR(64), createdAt VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
-  execute(
-    'CREATE TABLE IF NOT EXISTS invoices (id TEXT PRIMARY KEY, invoiceNo TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, description TEXT NOT NULL, amount INTEGER NOT NULL, vat INTEGER NOT NULL, totalAmount INTEGER NOT NULL, status TEXT NOT NULL, dueDate TEXT NOT NULL, createdAt TEXT NOT NULL)'
+  await execute(
+    'CREATE TABLE IF NOT EXISTS invoices (id VARCHAR(64) PRIMARY KEY, invoiceNo VARCHAR(64) NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, description TEXT NOT NULL, amount INT NOT NULL, vat INT NOT NULL, totalAmount INT NOT NULL, status VARCHAR(64) NOT NULL, dueDate VARCHAR(64) NOT NULL, createdAt VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
   );
 }
 
-function getSession(req: express.Request) {
+async function getSession(req: express.Request) {
   const authHeader = req.get('authorization');
   let sessionId = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
   if (!sessionId) {
@@ -276,15 +272,14 @@ function getSession(req: express.Request) {
 
   if (!sessionId) return null;
 
-  const row = queryOne<Record<string, unknown>>(
-    'SELECT session_id as sessionId, role, username, display_name as displayName, expires_at as expiresAt FROM sessions WHERE session_id = ?',
+  const row = await queryOne<Record<string, unknown>>(
+    'SELECT sessionId, role, username, displayName, expiresAt FROM sessions WHERE sessionId = ?',
     [sessionId]
   );
 
   if (!row) return null;
   if (Number(row.expiresAt) <= Date.now()) {
-    execute('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
-    persistDb();
+    await execute('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
     return null;
   }
 
@@ -297,8 +292,8 @@ function getSession(req: express.Request) {
   } satisfies SessionRow & { sessionId: string };
 }
 
-function requireSession(req: express.Request, res: express.Response) {
-  const session = getSession(req);
+async function requireSession(req: express.Request, res: express.Response) {
+  const session = await getSession(req);
   if (!session) {
     res.status(401).json({ message: 'ยังไม่ได้เข้าสู่ระบบ' });
     return null;
@@ -306,38 +301,37 @@ function requireSession(req: express.Request, res: express.Response) {
   return session;
 }
 
-function createSession(role: PortalRole, username: string) {
+async function createSession(role: PortalRole, username: string) {
   const sessionId = randomUUID();
   const displayName = ACCOUNTS[role].displayName;
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  execute(
-    'INSERT INTO sessions (session_id, role, username, display_name, expires_at) VALUES (?, ?, ?, ?, ?)',
+  await execute(
+    'INSERT INTO sessions (sessionId, role, username, displayName, expiresAt) VALUES (?, ?, ?, ?, ?)',
     [sessionId, role, username, displayName, expiresAt]
   );
-  persistDb();
   return { sessionId, role, username, displayName, expiresAt };
 }
 
-function clearSession(sessionId: string | null) {
+async function clearSession(sessionId: string | null) {
   if (!sessionId) return;
-  execute('DELETE FROM sessions WHERE session_id = ?', [sessionId]);
-  persistDb();
+  await execute('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
 }
 
-function seedDatabase() {
-  createSchema();
-  if (dbCount('packages') > 0) return;
+async function seedDatabase() {
+  await createSchema();
+  if ((await dbCount('packages')) > 0) return;
 
-  transaction(() => {
-    INITIAL_PACKAGES.forEach((pkg) => {
-      execute(
+  await transaction(async (connection) => {
+    for (const pkg of INITIAL_PACKAGES) {
+      await execute(
         'INSERT INTO packages (id, name, price, duration, description, guarantee, features) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [pkg.id, pkg.name, pkg.price, pkg.duration, pkg.description, pkg.guarantee, JSON.stringify(pkg.features)]
+        [pkg.id, pkg.name, pkg.price, pkg.duration, pkg.description, pkg.guarantee, JSON.stringify(pkg.features)],
+        connection
       );
-    });
+    }
 
-    INITIAL_PROBLEMS.forEach((problem) => {
-      execute(
+    for (const problem of INITIAL_PROBLEMS) {
+      await execute(
         'INSERT INTO problems (id, customerName, customerPhone, address, pestType, description, urgency, createdAt, status, assignedTeam, appointmentDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           problem.id,
@@ -351,12 +345,13 @@ function seedDatabase() {
           problem.status,
           problem.assignedTeam ?? null,
           problem.appointmentDate ?? null
-        ]
+        ],
+        connection
       );
-    });
+    }
 
-    INITIAL_BOOKINGS.forEach((booking) => {
-      execute(
+    for (const booking of INITIAL_BOOKINGS) {
+      await execute(
         'INSERT INTO bookings (id, packageId, packageName, customerName, customerPhone, address, bookingDate, price, status, invoiceNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           booking.id,
@@ -369,12 +364,13 @@ function seedDatabase() {
           booking.price,
           booking.status,
           booking.invoiceNo ?? null
-        ]
+        ],
+        connection
       );
-    });
+    }
 
-    INITIAL_CONTRACTS.forEach((contract) => {
-      execute(
+    for (const contract of INITIAL_CONTRACTS) {
+      await execute(
         'INSERT INTO contracts (id, customerName, customerPhone, address, packageName, startDate, endDate, totalVisits, completedVisits, nextVisitDate, price, status, documentNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           contract.id,
@@ -390,12 +386,13 @@ function seedDatabase() {
           contract.price,
           contract.status,
           contract.documentNo
-        ]
+        ],
+        connection
       );
-    });
+    }
 
-    INITIAL_JOBS.forEach((job) => {
-      execute(
+    for (const job of INITIAL_JOBS) {
+      await execute(
         'INSERT INTO jobs (id, sourceId, sourceType, title, description, customerName, customerPhone, address, appointmentDate, assignedTeam, status, notesByTech, imageReport, chemicalsUsed, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           job.id,
@@ -414,12 +411,13 @@ function seedDatabase() {
           JSON.stringify(job.chemicalsUsed ?? []),
           job.completedAt ?? null,
           new Date().toISOString()
-        ]
+        ],
+        connection
       );
-    });
+    }
 
-    INITIAL_INVOICES.forEach((invoice) => {
-      execute(
+    for (const invoice of INITIAL_INVOICES) {
+      await execute(
         'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
           invoice.id,
@@ -434,32 +432,33 @@ function seedDatabase() {
           invoice.status,
           invoice.dueDate,
           invoice.createdAt
-        ]
+        ],
+        connection
       );
-    });
+    }
   });
 }
 
-function getState() {
+async function getState() {
   return {
-    problems: queryAll('SELECT * FROM problems ORDER BY createdAt DESC').map(toProblem),
-    bookings: queryAll('SELECT * FROM bookings ORDER BY rowid DESC').map(toBooking),
-    contracts: queryAll('SELECT * FROM contracts ORDER BY startDate DESC').map(toContract),
-    jobs: queryAll('SELECT * FROM jobs ORDER BY rowid DESC').map(toJob),
-    invoices: queryAll('SELECT * FROM invoices ORDER BY createdAt DESC').map(toInvoice),
-    packages: queryAll('SELECT * FROM packages ORDER BY id ASC').map(toPackage)
+    problems: (await queryAll('SELECT * FROM problems ORDER BY createdAt DESC')).map(toProblem),
+    bookings: (await queryAll('SELECT * FROM bookings ORDER BY id DESC')).map(toBooking),
+    contracts: (await queryAll('SELECT * FROM contracts ORDER BY startDate DESC')).map(toContract),
+    jobs: (await queryAll('SELECT * FROM jobs ORDER BY createdAt DESC')).map(toJob),
+    invoices: (await queryAll('SELECT * FROM invoices ORDER BY createdAt DESC')).map(toInvoice),
+    packages: (await queryAll('SELECT * FROM packages ORDER BY id ASC')).map(toPackage)
   };
 }
 
-function getSourceRecord(sourceType: 'problem' | 'booking', sourceId: string) {
+async function getSourceRecord(sourceType: 'problem' | 'booking', sourceId: string) {
   if (sourceType === 'problem') {
     return queryOne<Record<string, unknown>>('SELECT * FROM problems WHERE id = ?', [sourceId]);
   }
   return queryOne<Record<string, unknown>>('SELECT * FROM bookings WHERE id = ?', [sourceId]);
 }
 
-function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates?: Partial<TechnicianJob>) {
-  execute(
+async function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates: Partial<TechnicianJob> | undefined, runner: QueryRunner) {
+  await execute(
     'UPDATE jobs SET status = ?, notesByTech = COALESCE(?, notesByTech), imageReport = COALESCE(?, imageReport), chemicalsUsed = COALESCE(?, chemicalsUsed), completedAt = COALESCE(?, completedAt) WHERE id = ?',
     [
       status,
@@ -468,31 +467,32 @@ function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates?: Pa
       updates?.chemicalsUsed ? JSON.stringify(updates.chemicalsUsed) : null,
       updates?.completedAt ?? null,
       job.id
-    ]
+    ],
+    runner
   );
 
   if (job.sourceType === 'problem') {
     const nextStatus = status === 'ส่งงานแล้ว' ? 'กำลังดำเนินการ' : status === 'เสร็จสิ้นและตรวจรับ' ? 'เสร็จสิ้น' : null;
     if (nextStatus) {
-      execute('UPDATE problems SET status = ? WHERE id = ?', [nextStatus, job.sourceId]);
+      await execute('UPDATE problems SET status = ? WHERE id = ?', [nextStatus, job.sourceId], runner);
     }
     return;
   }
 
   const nextStatus = status === 'ส่งงานแล้ว' ? 'กำลังจัดทีมงาน' : status === 'เสร็จสิ้นและตรวจรับ' ? 'เสร็จสิ้น' : null;
   if (nextStatus) {
-    execute('UPDATE bookings SET status = ? WHERE id = ?', [nextStatus, job.sourceId]);
+    await execute('UPDATE bookings SET status = ? WHERE id = ?', [nextStatus, job.sourceId], runner);
   }
 }
 
-seedDatabase();
+await seedDatabase();
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'sqlite' });
+  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'mysql' });
 });
 
-app.get('/api/me', (req, res) => {
-  const session = getSession(req);
+app.get('/api/me', async (req, res) => {
+  const session = await getSession(req);
   if (!session) {
     return res.status(401).json({ message: 'ยังไม่ได้เข้าสู่ระบบ' });
   }
@@ -505,7 +505,7 @@ app.get('/api/me', (req, res) => {
   });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password, role } = req.body ?? {};
   if (!username || !password || !role) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลเข้าสู่ระบบให้ครบถ้วน' });
@@ -520,7 +520,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
 
-  const session = createSession(role as PortalRole, username);
+  const session = await createSession(role as PortalRole, username);
   res.setHeader(
     'Set-Cookie',
     serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -539,7 +539,7 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-app.post('/api/logout', (req, res) => {
+app.post('/api/logout', async (req, res) => {
   const sessionId = (() => {
     const authHeader = req.get('authorization');
     if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7).trim();
@@ -547,7 +547,7 @@ app.post('/api/logout', (req, res) => {
     return cookies[SESSION_COOKIE] || null;
   })();
 
-  clearSession(sessionId);
+  await clearSession(sessionId);
   res.setHeader(
     'Set-Cookie',
     serializeCookie(SESSION_COOKIE, '', {
@@ -561,13 +561,13 @@ app.post('/api/logout', (req, res) => {
   return res.json({ ok: true });
 });
 
-app.get('/api/state', (req, res) => {
-  if (!requireSession(req, res)) return;
-  return res.json(getState());
+app.get('/api/state', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  return res.json(await getState());
 });
 
-app.post('/api/problems', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.post('/api/problems', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { customerName, customerPhone, address, pestType, description, urgency } = req.body ?? {};
 
   if (!customerName || !customerPhone || !address || !pestType || !description || !urgency) {
@@ -575,7 +575,7 @@ app.post('/api/problems', (req, res) => {
   }
 
   const entry: PestProblem = {
-    id: makeId('prob', 100, dbCount('problems')),
+    id: makeId('prob', 100, await dbCount('problems')),
     customerName,
     customerPhone,
     address,
@@ -586,38 +586,38 @@ app.post('/api/problems', (req, res) => {
     status: 'รอดำเนินการ'
   };
 
-  transaction(() => {
-    execute(
-      'INSERT INTO problems (id, customerName, customerPhone, address, pestType, description, urgency, createdAt, status, assignedTeam, appointmentDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        entry.id,
-        entry.customerName,
-        entry.customerPhone,
-        entry.address,
-        entry.pestType,
-        entry.description,
-        entry.urgency,
-        entry.createdAt,
-        entry.status,
-        null,
-        null
-      ]
-    );
-  });
+  await execute(
+    'INSERT INTO problems (id, customerName, customerPhone, address, pestType, description, urgency, createdAt, status, assignedTeam, appointmentDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      entry.id,
+      entry.customerName,
+      entry.customerPhone,
+      entry.address,
+      entry.pestType,
+      entry.description,
+      entry.urgency,
+      entry.createdAt,
+      entry.status,
+      null,
+      null
+    ]
+  );
 
   return res.json({ ok: true, problem: entry });
 });
 
-app.post('/api/bookings', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.post('/api/bookings', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { packageId, packageName, customerName, customerPhone, address, bookingDate, price } = req.body ?? {};
 
   if (!packageId || !packageName || !customerName || !customerPhone || !address || !bookingDate || typeof price !== 'number') {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
+  const bookingCount = await dbCount('bookings');
+  const invoiceCount = await dbCount('invoices');
   const booking: Booking = {
-    id: makeId('book', 200, dbCount('bookings')),
+    id: makeId('book', 200, bookingCount),
     packageId,
     packageName,
     customerName,
@@ -626,11 +626,11 @@ app.post('/api/bookings', (req, res) => {
     bookingDate,
     price,
     status: 'ชำระเงินแล้ว',
-    invoiceNo: `INV-2026-00${dbCount('invoices') + 1}`
+    invoiceNo: `INV-2026-00${invoiceCount + 1}`
   };
 
   const invoice: Invoice = {
-    id: makeId('inv', 400, dbCount('invoices')),
+    id: makeId('inv', 400, invoiceCount),
     invoiceNo: booking.invoiceNo!,
     customerName,
     customerPhone,
@@ -644,8 +644,8 @@ app.post('/api/bookings', (req, res) => {
     createdAt: new Date().toISOString().split('T')[0]
   };
 
-  transaction(() => {
-    execute(
+  await transaction(async (connection) => {
+    await execute(
       'INSERT INTO bookings (id, packageId, packageName, customerName, customerPhone, address, bookingDate, price, status, invoiceNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         booking.id,
@@ -658,10 +658,11 @@ app.post('/api/bookings', (req, res) => {
         booking.price,
         booking.status,
         booking.invoiceNo
-      ]
+      ],
+      connection
     );
 
-    execute(
+    await execute(
       'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         invoice.id,
@@ -676,27 +677,28 @@ app.post('/api/bookings', (req, res) => {
         invoice.status,
         invoice.dueDate,
         invoice.createdAt
-      ]
+      ],
+      connection
     );
   });
 
   return res.json({ ok: true, booking, invoice });
 });
 
-app.post('/api/jobs/assign', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.post('/api/jobs/assign', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { sourceId, sourceType, teamName, date, title, desc } = req.body ?? {};
   if (!sourceId || !sourceType || !teamName || !date || !title || !desc) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
-  const source = getSourceRecord(sourceType, sourceId);
+  const source = await getSourceRecord(sourceType, sourceId);
   if (!source) {
     return res.status(404).json({ message: 'ไม่พบรายการต้นทาง' });
   }
 
   const job: TechnicianJob = {
-    id: makeId('job', 500, dbCount('jobs')),
+    id: makeId('job', 500, await dbCount('jobs')),
     sourceId,
     sourceType,
     title,
@@ -709,8 +711,8 @@ app.post('/api/jobs/assign', (req, res) => {
     status: 'กำลังเตรียมตัว'
   };
 
-  transaction(() => {
-    execute(
+  await transaction(async (connection) => {
+    await execute(
       'INSERT INTO jobs (id, sourceId, sourceType, title, description, customerName, customerPhone, address, appointmentDate, assignedTeam, status, notesByTech, imageReport, chemicalsUsed, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         job.id,
@@ -729,55 +731,57 @@ app.post('/api/jobs/assign', (req, res) => {
         JSON.stringify([]),
         null,
         new Date().toISOString()
-      ]
+      ],
+      connection
     );
 
     if (sourceType === 'problem') {
-      execute('UPDATE problems SET status = ?, assignedTeam = ?, appointmentDate = ? WHERE id = ?', [
+      await execute('UPDATE problems SET status = ?, assignedTeam = ?, appointmentDate = ? WHERE id = ?', [
         'จัดสรรคิวช่างแล้ว',
         teamName,
         date,
         sourceId
-      ]);
+      ], connection);
     } else {
-      execute('UPDATE bookings SET status = ? WHERE id = ?', ['กำลังจัดทีมงาน', sourceId]);
+      await execute('UPDATE bookings SET status = ? WHERE id = ?', ['กำลังจัดทีมงาน', sourceId], connection);
     }
   });
 
   return res.json({ ok: true, job });
 });
 
-app.patch('/api/jobs/:jobId/status', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.patch('/api/jobs/:jobId/status', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { jobId } = req.params;
   const { status, updates } = req.body ?? {};
   if (!status) {
     return res.status(400).json({ message: 'กรุณาระบุสถานะงาน' });
   }
 
-  const job = queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
+  const job = await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
   if (!job) {
     return res.status(404).json({ message: 'ไม่พบงานช่าง' });
   }
 
-  transaction(() => {
-    syncJobSourceStatus(toJob(job), status as JobStatus, updates);
+  await transaction(async (connection) => {
+    await syncJobSourceStatus(toJob(job), status as JobStatus, updates, connection);
   });
 
-  return res.json({ ok: true, job: queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]) });
+  return res.json({ ok: true, job: await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]) });
 });
 
-app.post('/api/jobs/:jobId/approve', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.post('/api/jobs/:jobId/approve', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { jobId } = req.params;
-  const jobRow = queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
+  const jobRow = await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
   if (!jobRow) {
     return res.status(404).json({ message: 'ไม่พบงานช่าง' });
   }
 
   const job = toJob(jobRow);
+  const contractCount = await dbCount('contracts');
   const contract: Contract = {
-    id: makeId('cont', 300, dbCount('contracts')),
+    id: makeId('cont', 300, contractCount),
     customerName: job.customerName,
     customerPhone: job.customerPhone,
     address: job.address,
@@ -795,18 +799,18 @@ app.post('/api/jobs/:jobId/approve', (req, res) => {
     nextVisitDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     price: job.title.includes('พ่นเคมี') ? 8500 : 15000,
     status: 'เปิดใช้งาน',
-    documentNo: `CONT-2026-${300 + dbCount('contracts') + 1}`
+    documentNo: `CONT-2026-${300 + contractCount + 1}`
   };
 
-  transaction(() => {
-    execute('UPDATE jobs SET status = ? WHERE id = ?', ['เสร็จสิ้นและตรวจรับ', jobId]);
+  await transaction(async (connection) => {
+    await execute('UPDATE jobs SET status = ? WHERE id = ?', ['เสร็จสิ้นและตรวจรับ', jobId], connection);
     if (job.sourceType === 'problem') {
-      execute('UPDATE problems SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId]);
+      await execute('UPDATE problems SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId], connection);
     } else {
-      execute('UPDATE bookings SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId]);
+      await execute('UPDATE bookings SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId], connection);
     }
 
-    execute(
+    await execute(
       'INSERT INTO contracts (id, customerName, customerPhone, address, packageName, startDate, endDate, totalVisits, completedVisits, nextVisitDate, price, status, documentNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [
         contract.id,
@@ -822,15 +826,16 @@ app.post('/api/jobs/:jobId/approve', (req, res) => {
         contract.price,
         contract.status,
         contract.documentNo
-      ]
+      ],
+      connection
     );
   });
 
   return res.json({ ok: true, contract });
 });
 
-app.post('/api/invoices', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.post('/api/invoices', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate } = req.body ?? {};
   if (
     !customerName ||
@@ -846,9 +851,10 @@ app.post('/api/invoices', (req, res) => {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
+  const invoiceCount = await dbCount('invoices');
   const invoice: Invoice = {
-    id: makeId('inv', 400, dbCount('invoices')),
-    invoiceNo: `INV-2026-00${dbCount('invoices') + 1}`,
+    id: makeId('inv', 400, invoiceCount),
+    invoiceNo: `INV-2026-00${invoiceCount + 1}`,
     customerName,
     customerPhone,
     address,
@@ -861,47 +867,43 @@ app.post('/api/invoices', (req, res) => {
     createdAt: new Date().toISOString().split('T')[0]
   };
 
-  transaction(() => {
-    execute(
-      'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        invoice.id,
-        invoice.invoiceNo,
-        invoice.customerName,
-        invoice.customerPhone,
-        invoice.address,
-        invoice.description,
-        invoice.amount,
-        invoice.vat,
-        invoice.totalAmount,
-        invoice.status,
-        invoice.dueDate,
-        invoice.createdAt
-      ]
-    );
-  });
+  await execute(
+    'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      invoice.id,
+      invoice.invoiceNo,
+      invoice.customerName,
+      invoice.customerPhone,
+      invoice.address,
+      invoice.description,
+      invoice.amount,
+      invoice.vat,
+      invoice.totalAmount,
+      invoice.status,
+      invoice.dueDate,
+      invoice.createdAt
+    ]
+  );
 
   return res.json({ ok: true, invoice });
 });
 
-app.patch('/api/invoices/:invoiceId/status', (req, res) => {
-  if (!requireSession(req, res)) return;
+app.patch('/api/invoices/:invoiceId/status', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
   const { invoiceId } = req.params;
   const { status } = req.body ?? {};
   if (!status) {
     return res.status(400).json({ message: 'กรุณาระบุสถานะใบแจ้งหนี้' });
   }
 
-  transaction(() => {
-    execute('UPDATE invoices SET status = ? WHERE id = ?', [status, invoiceId]);
-  });
+  await execute('UPDATE invoices SET status = ? WHERE id = ?', [status, invoiceId]);
 
   return res.json({ ok: true });
 });
 
-app.post('/api/reload', (req, res) => {
-  if (!requireSession(req, res)) return;
-  return res.json(getState());
+app.post('/api/reload', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  return res.json(await getState());
 });
 
 if (existsSync(path.join(__dirname, 'dist', 'index.html'))) {
@@ -910,8 +912,6 @@ if (existsSync(path.join(__dirname, 'dist', 'index.html'))) {
     res.sendFile(path.join(__dirname, 'dist', 'index.html'));
   });
 }
-
-persistDb();
 
 app.listen(port, host, () => {
   console.log(`Auth API listening on http://${host}:${port}`);
