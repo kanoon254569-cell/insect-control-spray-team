@@ -27,6 +27,8 @@ interface TechnicianPortalProps {
 export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJobStatus }: TechnicianPortalProps) {
   const [selectedTeam, setSelectedTeam] = useState<string>(teamName || '');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [jobStatusLoading, setJobStatusLoading] = useState(false);
+  const [jobReportLoading, setJobReportLoading] = useState(false);
 
   // Form states for submitting job report
   const [reportNotes, setReportNotes] = useState('');
@@ -57,6 +59,7 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
   const canUpdateJobs = teamRole !== 'team_member';
 
   const handleStatusChange = async (jobId: string, currentStatus: JobStatus) => {
+    if (jobStatusLoading) return;
     if (!canUpdateJobs) {
       alert('สมาชิกทีมยังไม่สามารถส่งงานหรืออัปเดตสถานะได้ กรุณาให้หัวหน้าทีมดำเนินการแทน');
       return;
@@ -80,15 +83,18 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
       return;
     }
 
+    setJobStatusLoading(true);
     try {
       await onUpdateJobStatus(jobId, nextStatus);
     } catch {
       alert('อัปเดตสถานะงานไม่สำเร็จ');
+    } finally {
+      setJobStatusLoading(false);
     }
   };
 
   const submitJobReport = async () => {
-    if (!selectedJobId) return;
+    if (!selectedJobId || jobReportLoading) return;
     if (!reportNotes.trim()) {
       alert('กรุณากรอกรายละเอียดบันทึกผลงานการกำจัดปลวก');
       return;
@@ -102,6 +108,7 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
       return;
     }
 
+    setJobReportLoading(true);
     try {
       await onUpdateJobStatus(selectedJobId, 'ส่งงานแล้ว', {
         notesByTech: reportNotes,
@@ -117,6 +124,8 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
       setSelectedPhotoName('');
     } catch (error) {
       alert(error instanceof Error ? error.message : 'ส่งรายงานงานช่างไม่สำเร็จ');
+    } finally {
+      setJobReportLoading(false);
     }
   };
 
@@ -261,7 +270,8 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
                   canUpdateJobs ? (
                     <button
                       onClick={() => handleStatusChange(activeJob.id, activeJob.status)}
-                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all cursor-pointer shadow-xs"
+                      disabled={jobStatusLoading}
+                      className={`bg-amber-600 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow-xs ${jobStatusLoading ? 'opacity-60 cursor-not-allowed hover:bg-amber-600' : 'hover:bg-amber-700 cursor-pointer'}`}
                     >
                       {activeJob.status === 'กำลังเตรียมตัว' && (
                         <>
@@ -624,9 +634,10 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
                   <button
                     type="button"
                     onClick={submitJobReport}
-                    className="w-1/2 py-2.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl"
+                    disabled={jobReportLoading}
+                    className={`w-1/2 py-2.5 text-xs font-bold rounded-xl ${jobReportLoading ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700 text-white'}`}
                   >
-                    ส่งรายงานพ่นยาทันที
+                    {jobReportLoading ? 'กำลังส่ง...' : 'ส่งรายงานพ่นยาทันที'}
                   </button>
                 </div>
               </div>

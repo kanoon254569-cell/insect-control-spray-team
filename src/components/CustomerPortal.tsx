@@ -63,6 +63,7 @@ export default function CustomerPortal({
     urgency: 'ปานกลาง' as 'ต่ำ' | 'ปานกลาง' | 'สูง' | 'เร่งด่วนที่สุด'
   });
   const [reportSuccess, setReportSuccess] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
 
   // State for Booking Package Form / Dialog
   const [selectedPkg, setSelectedPkg] = useState<ServicePackage | null>(null);
@@ -73,6 +74,7 @@ export default function CustomerPortal({
     bookingDate: ''
   });
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [bookingLoading, setBookingLoading] = useState(false);
 
   // Selected job for tracking details
   const [selectedTrackJobId, setSelectedTrackJobId] = useState<string | null>(null);
@@ -80,11 +82,13 @@ export default function CustomerPortal({
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (reportLoading) return;
     if (!reportForm.customerName || !reportForm.customerPhone || !reportForm.address || !reportForm.description) {
       alert('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
     try {
+      setReportLoading(true);
       await onAddProblem(reportForm);
       setReportSuccess(true);
       setTimeout(() => {
@@ -101,17 +105,21 @@ export default function CustomerPortal({
       }, 2000);
     } catch {
       alert('ส่งรายงานไม่สำเร็จ');
+    } finally {
+      setReportLoading(false);
     }
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (bookingLoading) return;
     if (!selectedPkg) return;
     if (!bookingForm.customerName || !bookingForm.customerPhone || !bookingForm.address || !bookingForm.bookingDate) {
       alert('กรุณากรอกข้อมูลจองคิวให้ครบถ้วน');
       return;
     }
     try {
+      setBookingLoading(true);
       await onAddBooking({
         packageId: selectedPkg.id,
         packageName: selectedPkg.name,
@@ -135,6 +143,8 @@ export default function CustomerPortal({
       }, 2000);
     } catch {
       alert('จองบริการไม่สำเร็จ');
+    } finally {
+      setBookingLoading(false);
     }
   };
 
@@ -387,9 +397,10 @@ export default function CustomerPortal({
                           <button
                             type="submit"
                             id="btn-confirm-booking"
-                            className="w-1/2 py-2.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors"
+                            disabled={bookingLoading}
+                            className="w-1/2 py-2.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                           >
-                            ยืนยันการสั่งจองคิว
+                            {bookingLoading ? 'กำลังยืนยัน...' : 'ยืนยันการสั่งจองคิว'}
                           </button>
                         </div>
                       </form>
@@ -514,9 +525,10 @@ export default function CustomerPortal({
                   <button
                     type="submit"
                     id="btn-submit-report"
-                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors cursor-pointer"
+                    disabled={reportLoading}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    ส่งข้อมูลแจ้งปัญหาทันที
+                    {reportLoading ? 'กำลังส่ง...' : 'ส่งข้อมูลแจ้งปัญหาทันที'}
                   </button>
                 </form>
               )}

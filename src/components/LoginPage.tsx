@@ -29,13 +29,21 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
   });
   const [showPassword, setShowPassword] = useState(false);
 
+  const [formLoading, setFormLoading] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'register') {
-      await onRegister(values);
-      return;
+    if (formLoading) return;
+    setFormLoading(true);
+    try {
+      if (mode === 'register') {
+        await onRegister(values);
+      } else {
+        await onLogin(values);
+      }
+    } finally {
+      setFormLoading(false);
     }
-    await onLogin(values);
   };
 
   return (
@@ -142,10 +150,10 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || formLoading}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-amber-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-amber-900/20 transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {loading
+              {loading || formLoading
                 ? mode === 'register'
                   ? 'กำลังสมัครบัญชี...'
                   : 'กำลังเข้าสู่ระบบ...'

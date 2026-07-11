@@ -78,6 +78,7 @@ export default function AdminPortal({
   const [assignedTeam, setAssignedTeam] = useState<string>('');
   const [appointmentDate, setAppointmentDate] = useState<string>('');
   const [dispatchSuccess, setDispatchSuccess] = useState(false);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
 
   useEffect(() => {
     if (!assignedTeam && teams.length > 0) {
@@ -95,6 +96,7 @@ export default function AdminPortal({
     dueDate: ''
   });
   const [invoiceSuccess, setInvoiceSuccess] = useState(false);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
 
   // Team member form states
   const [teamForm, setTeamForm] = useState({
@@ -109,11 +111,16 @@ export default function AdminPortal({
   });
   const [showPassword, setShowPassword] = useState(false);
   const [teamSuccess, setTeamSuccess] = useState(false);
+  const [teamMemberLoading, setTeamMemberLoading] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
   const [teamSectionForm, setTeamSectionForm] = useState({ name: '', description: '' });
   const [teamSectionSuccess, setTeamSectionSuccess] = useState(false);
+  const [teamSectionLoading, setTeamSectionLoading] = useState(false);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [invoiceActionLoadingId, setInvoiceActionLoadingId] = useState<string | null>(null);
+  const [jobApprovalLoadingId, setJobApprovalLoadingId] = useState<string | null>(null);
+  const [memberDeleteLoadingId, setMemberDeleteLoadingId] = useState<string | null>(null);
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -172,6 +179,7 @@ export default function AdminPortal({
     }
 
     try {
+      setDispatchLoading(true);
       await onAssignJob(selectedSourceId, selectedSourceType, assignedTeam, appointmentDate, title, desc);
       setDispatchSuccess(true);
       setTimeout(() => {
@@ -181,6 +189,8 @@ export default function AdminPortal({
       }, 2000);
     } catch {
       alert('จัดคิวงานไม่สำเร็จ');
+    } finally {
+      setDispatchLoading(false);
     }
   };
 
@@ -196,6 +206,7 @@ export default function AdminPortal({
     const totalAmount = amount + vat;
 
     try {
+      setInvoiceLoading(true);
       await onAddInvoice({
         customerName: invoiceForm.customerName,
         customerPhone: invoiceForm.customerPhone,
@@ -222,6 +233,8 @@ export default function AdminPortal({
       }, 2000);
     } catch {
       alert('สร้างใบแจ้งหนี้ไม่สำเร็จ');
+    } finally {
+      setInvoiceLoading(false);
     }
   };
 
@@ -491,9 +504,10 @@ export default function AdminPortal({
                 <button
                   type="submit"
                   id="btn-confirm-dispatch"
-                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                  disabled={dispatchLoading}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 rounded-xl text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  อนุมัติจัดส่งทีมช่างทันที
+                  {dispatchLoading ? 'กำลังจัดคิว...' : 'อนุมัติจัดส่งทีมช่างทันที'}
                 </button>
               </form>
             )}
@@ -793,15 +807,20 @@ export default function AdminPortal({
                         {inv.status === 'ค้างชำระ' && (
                           <button
                             onClick={async () => {
+                              if (invoiceActionLoadingId !== null) return;
+                              setInvoiceActionLoadingId(inv.id);
                               try {
                                 await onUpdateInvoiceStatus(inv.id, 'ชำระเงินแล้ว');
                               } catch {
                                 alert('อัปเดตสถานะใบแจ้งหนี้ไม่สำเร็จ');
+                              } finally {
+                                setInvoiceActionLoadingId(null);
                               }
                             }}
-                            className="text-[10px] bg-emerald-500 text-white font-bold px-2 py-1 rounded hover:bg-emerald-600"
+                            disabled={invoiceActionLoadingId === inv.id}
+                            className={`text-[10px] font-bold px-2 py-1 rounded ${invoiceActionLoadingId === inv.id ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
                           >
-                            รับเงิน
+                            {invoiceActionLoadingId === inv.id ? 'กำลังบันทึก...' : 'รับเงิน'}
                           </button>
                         )}
                       </td>
@@ -887,15 +906,20 @@ export default function AdminPortal({
                         {job.status === 'ส่งงานแล้ว' ? (
                           <button
                             onClick={async () => {
+                              if (jobApprovalLoadingId !== null) return;
+                              setJobApprovalLoadingId(job.id);
                               try {
                                 await onApproveJobCompletion(job.id);
                               } catch {
                                 alert('ตรวจรับงานไม่สำเร็จ');
+                              } finally {
+                                setJobApprovalLoadingId(null);
                               }
                             }}
-                            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[10px] px-2 py-1 rounded-md"
+                            disabled={jobApprovalLoadingId === job.id}
+                            className={`font-bold text-[10px] px-2 py-1 rounded-md ${jobApprovalLoadingId === job.id ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
                           >
-                            ตรวจรับงาน
+                            {jobApprovalLoadingId === job.id ? 'กำลังตรวจรับ...' : 'ตรวจรับงาน'}
                           </button>
                         ) : (
                           <span className="text-[10px] text-slate-400 font-medium">ตรวจรับเสร็จสมบูรณ์</span>
@@ -929,6 +953,7 @@ export default function AdminPortal({
                     return;
                   }
                   try {
+                    setTeamSectionLoading(true);
                     if (editingTeamId) {
                       await onUpdateTeam(editingTeamId, {
                         name: teamSectionForm.name,
@@ -946,6 +971,8 @@ export default function AdminPortal({
                     setTeamSectionForm({ name: '', description: '' });
                   } catch {
                     alert('บันทึกข้อมูลทีมไม่สำเร็จ');
+                  } finally {
+                    setTeamSectionLoading(false);
                   }
                 }}
                 className="space-y-4"
@@ -975,9 +1002,10 @@ export default function AdminPortal({
                 <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
+                    disabled={teamSectionLoading}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {editingTeamId ? 'อัปเดตทีม' : 'สร้างทีมใหม่'}
+                    {teamSectionLoading ? 'กำลังบันทึก...' : editingTeamId ? 'อัปเดตทีม' : 'สร้างทีมใหม่'}
                   </button>
                   {editingTeamId && (
                     <button
@@ -1079,11 +1107,41 @@ export default function AdminPortal({
                         status: 'active'
                       });
                     }
+                    setTeamMemberLoading(true);
+                    if (editingMemberId) {
+                      const updateData: Partial<TeamMember> & { password?: string } = {
+                        name: teamForm.name,
+                        phone: teamForm.phone,
+                        email: teamForm.email,
+                        role: teamForm.role,
+                        teamId: teamForm.teamId,
+                        teamName: teamForm.teamName
+                      };
+                      if (teamForm.password) {
+                        updateData.password = teamForm.password;
+                      }
+                      await onUpdateTeamMember(editingMemberId, updateData);
+                      setEditingMemberId(null);
+                    } else {
+                      await onAddTeamMember({
+                        name: teamForm.name,
+                        phone: teamForm.phone,
+                        email: teamForm.email,
+                        username: teamForm.username,
+                        password: teamForm.password,
+                        role: teamForm.role,
+                        teamId: teamForm.teamId,
+                        teamName: teamForm.teamName,
+                        status: 'active'
+                      });
+                    }
                     setTeamSuccess(true);
                     setTimeout(() => setTeamSuccess(false), 2000);
                     setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member', teamId: '', teamName: '' });
                   } catch {
                     alert('บันทึกข้อมูลไม่สำเร็จ');
+                  } finally {
+                    setTeamMemberLoading(false);
                   }
                 }}
                 className="space-y-4"
@@ -1196,9 +1254,10 @@ export default function AdminPortal({
                 <div className="flex gap-3 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition"
+                    disabled={teamMemberLoading}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm py-2.5 rounded-xl transition disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {editingMemberId ? 'อัปเดตข้อมูล' : 'เพิ่มสมาชิกใหม่'}
+                    {teamMemberLoading ? 'กำลังบันทึก...' : editingMemberId ? 'อัปเดตข้อมูล' : 'เพิ่มสมาชิกใหม่'}
                   </button>
                   {editingMemberId && (
                     <button
@@ -1283,17 +1342,22 @@ export default function AdminPortal({
                           <button
                             type="button"
                             onClick={async () => {
+                              if (memberDeleteLoadingId !== null) return;
                               if (confirm(`คุณแน่ใจที่จะลบ ${member.name} ออกจากระบบหรือไม่?`)) {
+                                setMemberDeleteLoadingId(member.id);
                                 try {
                                   await onDeleteTeamMember(member.id);
                                 } catch {
                                   alert('ลบข้อมูลไม่สำเร็จ');
+                                } finally {
+                                  setMemberDeleteLoadingId(null);
                                 }
                               }
                             }}
-                            className="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold rounded text-[9px]"
+                            disabled={memberDeleteLoadingId === member.id}
+                            className={`px-2 py-1 font-bold rounded text-[9px] ${memberDeleteLoadingId === member.id ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-rose-100 hover:bg-rose-200 text-rose-800'}`}
                           >
-                            ลบ
+                            {memberDeleteLoadingId === member.id ? 'กำลังลบ...' : 'ลบ'}
                           </button>
                         </td>
                       </tr>
