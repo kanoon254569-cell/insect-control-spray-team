@@ -1,21 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Bug,
-  User,
-  Wrench,
-  ShieldAlert,
   ArrowRight,
   Eye,
   EyeOff
 } from 'lucide-react';
-import { PortalRole } from '../types';
 
 type LoginValues = {
   username: string;
   password: string;
   displayName: string;
-  role: PortalRole;
 };
 
 interface LoginPageProps {
@@ -25,46 +20,14 @@ interface LoginPageProps {
   error: string | null;
 }
 
-const ROLE_OPTIONS: Array<{
-  role: PortalRole;
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-}> = [
-  {
-    role: 'user',
-    title: 'Admin',
-    subtitle: 'งานจัดการระบบ งานอนุมัติ และสรุปรายงาน',
-    icon: <ShieldAlert className="h-5 w-5" />
-  },
-  {
-    role: 'technician',
-    title: 'Technician',
-    subtitle: 'คิวงานช่าง อัปเดตสถานะ และส่งรายงานหน้างาน',
-    icon: <Wrench className="h-5 w-5" />
-  },
-  {
-    role: 'customer',
-    title: 'Customer',
-    subtitle: 'แจ้งปัญหา จองแพ็กเกจ และติดตามงานบริการ',
-    icon: <User className="h-5 w-5" />
-  }
-];
-
 export default function LoginPage({ onLogin, onRegister, loading, error }: LoginPageProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [values, setValues] = useState<LoginValues>({
     username: '',
     password: '',
-    displayName: '',
-    role: 'user'
+    displayName: ''
   });
   const [showPassword, setShowPassword] = useState(false);
-
-  const activeRole = useMemo(
-    () => ROLE_OPTIONS.find((item) => item.role === values.role) ?? ROLE_OPTIONS[0],
-    [values.role]
-  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,34 +80,6 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
             >
               สมัครบัญชี
             </button>
-          </div>
-
-          <div className="mb-6 rounded-2xl border border-black/10 bg-slate-50 px-4 py-3">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Current Role</div>
-            <div className="mt-1 flex items-center gap-2 text-sm font-extrabold text-slate-800">
-              {values.role === 'user' && <ShieldAlert className="h-4 w-4 text-amber-600" />}
-              {values.role === 'technician' && <Wrench className="h-4 w-4 text-amber-600" />}
-              {values.role === 'customer' && <User className="h-4 w-4 text-amber-600" />}
-              <span>{activeRole.title}</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {ROLE_OPTIONS.map((item) => (
-              <button
-                key={item.role}
-                type="button"
-                onClick={() => !loading && setValues((prev) => ({ ...prev, role: item.role }))}
-                disabled={loading}
-                className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
-                  values.role === item.role
-                    ? 'border-amber-500 bg-amber-50 text-amber-700'
-                    : 'border-black/10 bg-white text-slate-600 hover:border-black/20'
-                }`}
-              >
-                {item.title}
-              </button>
-            ))}
           </div>
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>

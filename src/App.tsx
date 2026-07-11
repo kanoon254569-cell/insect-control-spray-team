@@ -136,14 +136,14 @@ export default function App() {
     setRoute(path);
   };
 
-  const loginViaApi = async (username: string, password: string, role: PortalRole) => {
+  const loginViaApi = async (username: string, password: string) => {
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       credentials: 'include',
-      body: JSON.stringify({ username, password, role })
+      body: JSON.stringify({ username, password })
     });
 
     if (!response.ok) {
@@ -154,7 +154,7 @@ export default function App() {
     return response.json();
   };
 
-  const registerViaApi = async (values: { username: string; password: string; displayName: string; role: PortalRole }) => {
+  const registerViaApi = async (values: { username: string; password: string; displayName: string }) => {
     const response = await fetch('/api/register', {
       method: 'POST',
       headers: {
@@ -172,11 +172,11 @@ export default function App() {
     return response.json();
   };
 
-  const handleLogin = async (values: { username: string; password: string; role: PortalRole }) => {
+  const handleLogin = async (values: { username: string; password: string }) => {
     setLoginLoading(true);
     setAuthError(null);
     try {
-      const result = await loginViaApi(values.username, values.password, values.role);
+      const result = await loginViaApi(values.username, values.password);
       setSession({
         role: result.role,
         username: result.username,
@@ -203,7 +203,7 @@ export default function App() {
     }
   };
 
-  const handleRegister = async (values: { username: string; password: string; displayName: string; role: PortalRole }) => {
+  const handleRegister = async (values: { username: string; password: string; displayName: string }) => {
     setLoginLoading(true);
     setAuthError(null);
     try {

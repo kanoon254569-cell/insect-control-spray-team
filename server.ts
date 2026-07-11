@@ -115,6 +115,14 @@ function isPortalRole(value: unknown): value is PortalRole {
   return value === 'user' || value === 'technician' || value === 'customer';
 }
 
+function detectRoleFromUsername(username: string): PortalRole {
+  const normalized = username.toLowerCase().trim();
+  if (normalized === 'user' || normalized === 'admin') return 'user';
+  if (normalized === 'technician') return 'technician';
+  if (normalized === 'customer') return 'customer';
+  return 'customer'; // default
+}
+
 function normalizeUsername(username: unknown) {
   return typeof username === 'string' ? username.trim().toLowerCase() : '';
 }
@@ -329,16 +337,14 @@ app.get('/api/me', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-  const { username, password, role } = req.body ?? {};
-  if (!username || !password || !role) {
+  const { username, password } = req.body ?? {};
+  if (!username || !password) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลเข้าสู่ระบบให้ครบถ้วน' });
   }
 
-  if (!isPortalRole(role)) {
-    return res.status(400).json({ message: 'ไม่พบบทบาทผู้ใช้งาน' });
-  }
-
   const normalizedUsername = normalizeUsername(username);
+  const role = detectRoleFromUsername(normalizedUsername);
+
   const user = await users.findOne({ username: normalizedUsername, role }, { projection: { _id: 0 } });
   if (!user || typeof password !== 'string' || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
@@ -364,15 +370,12 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/register', async (req, res) => {
-  const { username, password, displayName, role } = req.body ?? {};
+  const { username, password, displayName } = req.body ?? {};
   const normalizedUsername = normalizeUsername(username);
+  const role = detectRoleFromUsername(normalizedUsername);
 
-  if (!normalizedUsername || typeof password !== 'string' || !password || !role) {
+  if (!normalizedUsername || typeof password !== 'string' || !password) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลสมัครบัญชีให้ครบถ้วน' });
-  }
-
-  if (!isPortalRole(role)) {
-    return res.status(400).json({ message: 'ไม่พบบทบาทผู้ใช้งาน' });
   }
 
   if (normalizedUsername.length < 3) {
@@ -385,7 +388,7 @@ app.post('/api/register', async (req, res) => {
 
   const existing = await users.findOne({ username: normalizedUsername, role });
   if (existing) {
-    return res.status(409).json({ message: 'มีบัญชีนี้ในบทบาทที่เลือกแล้ว' });
+    return res.status(409).json({ message: 'มีบัญชีนี้ในระบบแล้ว' });
   }
 
   const user = await createUser(normalizedUsername, password, role, normalizeDisplayName(displayName, normalizedUsername));
