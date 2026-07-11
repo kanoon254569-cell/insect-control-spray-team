@@ -87,8 +87,11 @@ export default function AdminPortal({
     name: '',
     phone: '',
     email: '',
+    username: '',
+    password: '',
     role: 'team_member' as TeamMemberRole
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [teamSuccess, setTeamSuccess] = useState(false);
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
 
@@ -892,16 +895,35 @@ export default function AdminPortal({
 
             <form onSubmit={async (e) => {
               e.preventDefault();
+              if (!teamForm.name || !teamForm.phone || !teamForm.email || !teamForm.username) {
+                alert('กรุณากรอกข้อมูลทั้งหมด');
+                return;
+              }
+              if (!editingMemberId && !teamForm.password) {
+                alert('กรุณากรอกรหัสผ่าน');
+                return;
+              }
+              if (!editingMemberId && teamForm.password.length < 6) {
+                alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+                return;
+              }
               try {
                 if (editingMemberId) {
-                  await onUpdateTeamMember(editingMemberId, teamForm);
+                  const updateData = {
+                    name: teamForm.name,
+                    phone: teamForm.phone,
+                    email: teamForm.email,
+                    role: teamForm.role,
+                    ...(teamForm.password && { password: teamForm.password })
+                  };
+                  await onUpdateTeamMember(editingMemberId, updateData);
                   setEditingMemberId(null);
                 } else {
                   await onAddTeamMember({ ...teamForm, status: 'active' });
                 }
                 setTeamSuccess(true);
                 setTimeout(() => setTeamSuccess(false), 2000);
-                setTeamForm({ name: '', phone: '', email: '', role: 'team_member' });
+                setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member' });
               } catch {
                 alert('บันทึกข้อมูลไม่สำเร็จ');
               }
@@ -952,6 +974,39 @@ export default function AdminPortal({
                     <option value="team_member">สมาชิกทีม (Team Member) - ดูปัญหา + เวลางาน เท่านั้น</option>
                   </select>
                 </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Username (ชื่อผู้ใช้)</span>
+                  <input
+                    value={teamForm.username}
+                    onChange={(e) => setTeamForm(prev => ({ ...prev, username: e.target.value }))}
+                    required
+                    disabled={!!editingMemberId}
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:text-slate-400"
+                    placeholder="เช่น dasd (ใช้สำหรับเข้าสู่ระบบ)"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">รหัสผ่าน {editingMemberId && '(ว่างไว้ = ไม่เปลี่ยน)'}</span>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={teamForm.password}
+                      onChange={(e) => setTeamForm(prev => ({ ...prev, password: e.target.value }))}
+                      required={!editingMemberId}
+                      className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 pr-12 text-sm font-semibold text-slate-900 outline-none focus:border-amber-400"
+                      placeholder={editingMemberId ? 'ว่างไว้เพื่อไม่เปลี่ยนรหัสผ่าน' : 'อย่างน้อย 6 ตัวอักษร'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                    >
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                </label>
               </div>
 
               <div className="flex gap-3 pt-2">
@@ -966,7 +1021,7 @@ export default function AdminPortal({
                     type="button"
                     onClick={() => {
                       setEditingMemberId(null);
-                      setTeamForm({ name: '', phone: '', email: '', role: 'team_member' });
+                      setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member' });
                     }}
                     className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition"
                   >
@@ -1034,6 +1089,8 @@ export default function AdminPortal({
                                 name: member.name,
                                 phone: member.phone,
                                 email: member.email,
+                                username: member.username,
+                                password: '',
                                 role: member.role
                               });
                             }}

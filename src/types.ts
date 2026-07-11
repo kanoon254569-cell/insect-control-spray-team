@@ -9,6 +9,8 @@ export interface TeamMember {
   name: string;
   phone: string;
   email: string;
+  username: string;
+  passwordHash?: string;
   role: TeamMemberRole;
   createdAt: string;
   status: 'active' | 'inactive';

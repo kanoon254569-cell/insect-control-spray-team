@@ -347,8 +347,37 @@ app.post('/api/login', async (req, res) => {
   }
 
   const normalizedUsername = normalizeUsername(username);
-  const role = detectRoleFromUsername(normalizedUsername);
+  
+  // First check if user is a team member
+  const teamMember = await teamMembersCollection.findOne({ username: normalizedUsername }, { projection: { _id: 0 } });
+  if (teamMember && teamMember.status === 'active' && teamMember.passwordHash) {
+    if (typeof password !== 'string' || !verifyPassword(password, teamMember.passwordHash)) {
+      return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
+    }
+    
+    // Create session for team member
+    const role = teamMember.role === 'team_lead' ? 'user' : 'technician';
+    const session = await createSession(role, normalizedUsername);
+    res.setHeader(
+      'Set-Cookie',
+      serializeCookie(SESSION_COOKIE, session.sessionId, {
+        httpOnly: true,
+        sameSite: 'Lax',
+        path: '/',
+        maxAge: SESSION_TTL_MS
+      })
+    );
+    
+    return res.json({
+      token: session.sessionId,
+      role: session.role,
+      username: session.username,
+      displayName: session.displayName
+    });
+  }
 
+  // Then check regular users
+  const role = detectRoleFromUsername(normalizedUsername);
   const user = await users.findOne({ username: normalizedUsername, role }, { projection: { _id: 0 } });
   if (!user || typeof password !== 'string' || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
@@ -673,14 +702,28 @@ app.get('/api/team-members', async (req, res) => {
 
 app.post('/api/team-members', async (req, res) => {
   if (!(await requireSession(req, res))) return;
-  const { name, phone, email, role } = req.body ?? {};
+  const { name, phone, email, username, password, role, status } = req.body ?? {};
 
-  if (!name || !phone || !email || !role) {
+  if (!name || !phone || !email || !username || !password || !role) {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลทั้งหมด' });
   }
 
   if (role !== 'team_lead' && role !== 'team_member') {
     return res.status(400).json({ message: 'บทบาทไม่ถูกต้อง' });
+  }
+
+  if (username.length < 3) {
+    return res.status(400).json({ message: 'Username ต้องมีอย่างน้อย 3 ตัวอักษร' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
+  }
+
+  // Check if username already exists
+  const existing = await teamMembersCollection.findOne({ username: username.toLowerCase() });
+  if (existing) {
+    return res.status(409).json({ message: 'Username นี้ถูกใช้งานแล้ว' });
   }
 
   const membersCount = await dbCount(teamMembersCollection);
@@ -689,6 +732,8 @@ app.post('/api/team-members', async (req, res) => {
     name,
     phone,
     email,
+    username: username.toLowerCase(),
+    passwordHash: hashPassword(password),
     role,
     createdAt: new Date().toISOString(),
     status: 'active'
@@ -701,12 +746,18 @@ app.post('/api/team-members', async (req, res) => {
 app.patch('/api/team-members/:memberId', async (req, res) => {
   if (!(await requireSession(req, res))) return;
   const { memberId } = req.params;
-  const { name, phone, email, role, status } = req.body ?? {};
+  const { name, phone, email, password, role, status } = req.body ?? {};
 
   const updateData: Record<string, unknown> = {};
   if (name) updateData.name = name;
   if (phone) updateData.phone = phone;
   if (email) updateData.email = email;
+  if (password) {
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
+    }
+    updateData.passwordHash = hashPassword(password);
+  }
   if (role && (role === 'team_lead' || role === 'team_member')) updateData.role = role;
   if (status && (status === 'active' || status === 'inactive')) updateData.status = status;
 
