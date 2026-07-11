@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import mysql, { Pool, PoolConnection } from 'mysql2/promise';
+import { MongoClient, Db, Collection } from 'mongodb';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { existsSync } from 'fs';
 import path from 'path';
@@ -33,35 +33,24 @@ const __dirname = path.dirname(__filename);
 const SESSION_COOKIE = 'bugguard_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
-function getMysqlUrl() {
-  if (process.env.MYSQL_URL) return process.env.MYSQL_URL;
-  if (process.env.DATABASE_URL?.startsWith('mysql://') || process.env.DATABASE_URL?.startsWith('mysql2://')) {
+function getMongoUri() {
+  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
+  if (process.env.DATABASE_URL?.startsWith('mongodb://') || process.env.DATABASE_URL?.startsWith('mongodb+srv://')) {
     return process.env.DATABASE_URL;
   }
   return null;
 }
 
-const databaseUrl = getMysqlUrl();
-const hasMysqlFieldConfig = Boolean(process.env.MYSQL_HOST || process.env.MYSQL_USER || process.env.MYSQL_DATABASE);
-
-if (!databaseUrl && !hasMysqlFieldConfig && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
+const mongoUri = getMongoUri();
+if (!mongoUri && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
   throw new Error(
-    'Missing MySQL configuration. Set MYSQL_URL on Render, for example mysql://USER:PASSWORD@HOST:3306/insect_control_spray_team'
+    'Missing MongoDB configuration. Set MONGODB_URI on Render, for example mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/insect_control_spray_team'
   );
 }
 
-const pool = databaseUrl
-  ? mysql.createPool(databaseUrl)
-  : mysql.createPool({
-      host: process.env.MYSQL_HOST ?? 'localhost',
-      port: Number(process.env.MYSQL_PORT ?? 3306),
-      user: process.env.MYSQL_USER ?? 'root',
-      password: process.env.MYSQL_PASSWORD ?? '',
-      database: process.env.MYSQL_DATABASE ?? 'insect_control_spray_team',
-      waitForConnections: true,
-      connectionLimit: 10,
-      charset: 'utf8mb4'
-    });
+const mongoClient = new MongoClient(mongoUri ?? 'mongodb://127.0.0.1:27017/insect_control_spray_team');
+await mongoClient.connect();
+const database: Db = mongoClient.db(process.env.MONGODB_DB || undefined);
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -72,13 +61,12 @@ const DEFAULT_ACCOUNTS: Array<{ username: string; password: string; role: Portal
 ];
 
 type SessionRow = {
+  sessionId: string;
   role: PortalRole;
   username: string;
   displayName: string;
   expiresAt: number;
 };
-
-type QueryRunner = Pool | PoolConnection;
 
 type UserRow = {
   id: string;
@@ -88,6 +76,17 @@ type UserRow = {
   displayName: string;
   createdAt: string;
 };
+
+type JobDocument = TechnicianJob & { createdAt: string };
+
+const users = database.collection<UserRow>('users');
+const sessions = database.collection<SessionRow>('sessions');
+const packagesCollection = database.collection<ServicePackage>('packages');
+const problemsCollection = database.collection<PestProblem>('problems');
+const bookingsCollection = database.collection<Booking>('bookings');
+const contractsCollection = database.collection<Contract>('contracts');
+const jobsCollection = database.collection<JobDocument>('jobs');
+const invoicesCollection = database.collection<Invoice>('invoices');
 
 function serializeCookie(
   name: string,
@@ -139,182 +138,32 @@ function verifyPassword(password: string, storedHash: string) {
   return storedBuffer.length === candidateBuffer.length && timingSafeEqual(storedBuffer, candidateBuffer);
 }
 
-async function queryAll<T = Record<string, unknown>>(sql: string, params: unknown[] = [], runner: QueryRunner = pool): Promise<T[]> {
-  const [rows] = await runner.execute(sql, params as Parameters<QueryRunner['execute']>[1]);
-  return rows as T[];
-}
-
-async function queryOne<T = Record<string, unknown>>(sql: string, params: unknown[] = [], runner: QueryRunner = pool): Promise<T | null> {
-  const rows = await queryAll<T>(sql, params, runner);
-  return rows[0] ?? null;
-}
-
-async function execute(sql: string, params: unknown[] = [], runner: QueryRunner = pool) {
-  await runner.execute(sql, params as Parameters<QueryRunner['execute']>[1]);
-}
-
-async function transaction<T>(fn: (connection: PoolConnection) => Promise<T>): Promise<T> {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await fn(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
 function makeId(prefix: string, base: number, index: number) {
   return `${prefix}-${base + index + 1}`;
 }
 
-function optionalString(value: unknown) {
-  return typeof value === 'string' && value.length > 0 ? value : undefined;
+function cleanMongo<T>(document: T): T {
+  const clone = { ...(document as Record<string, unknown>) };
+  delete clone._id;
+  return clone as T;
 }
 
-function parseJsonArray<T>(value: unknown, fallback: T[] = []): T[] {
-  if (Array.isArray(value)) return value as T[];
-  if (typeof value !== 'string' || value.length === 0) return fallback;
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
-  } catch {
-    return fallback;
-  }
+async function dbCount(collection: { countDocuments: () => Promise<number> }) {
+  return collection.countDocuments();
 }
 
-function toProblem(row: Record<string, unknown>): PestProblem {
-  return {
-    id: String(row.id),
-    customerName: String(row.customerName),
-    customerPhone: String(row.customerPhone),
-    address: String(row.address),
-    pestType: row.pestType as PestType,
-    description: String(row.description),
-    urgency: row.urgency as PestProblem['urgency'],
-    createdAt: String(row.createdAt),
-    status: row.status as PestProblem['status'],
-    assignedTeam: optionalString(row.assignedTeam),
-    appointmentDate: optionalString(row.appointmentDate)
-  };
-}
-
-function toBooking(row: Record<string, unknown>): Booking {
-  return {
-    id: String(row.id),
-    packageId: String(row.packageId),
-    packageName: String(row.packageName),
-    customerName: String(row.customerName),
-    customerPhone: String(row.customerPhone),
-    address: String(row.address),
-    bookingDate: String(row.bookingDate),
-    price: Number(row.price),
-    status: row.status as Booking['status'],
-    invoiceNo: optionalString(row.invoiceNo)
-  };
-}
-
-function toContract(row: Record<string, unknown>): Contract {
-  return {
-    id: String(row.id),
-    customerName: String(row.customerName),
-    customerPhone: String(row.customerPhone),
-    address: String(row.address),
-    packageName: String(row.packageName),
-    startDate: String(row.startDate),
-    endDate: String(row.endDate),
-    totalVisits: Number(row.totalVisits),
-    completedVisits: Number(row.completedVisits),
-    nextVisitDate: String(row.nextVisitDate),
-    price: Number(row.price),
-    status: row.status as Contract['status'],
-    documentNo: String(row.documentNo)
-  };
-}
-
-function toJob(row: Record<string, unknown>): TechnicianJob {
-  return {
-    id: String(row.id),
-    sourceId: String(row.sourceId),
-    sourceType: row.sourceType as TechnicianJob['sourceType'],
-    title: String(row.title),
-    description: String(row.description),
-    customerName: String(row.customerName),
-    customerPhone: String(row.customerPhone),
-    address: String(row.address),
-    appointmentDate: String(row.appointmentDate),
-    assignedTeam: String(row.assignedTeam),
-    status: row.status as JobStatus,
-    notesByTech: optionalString(row.notesByTech),
-    imageReport: optionalString(row.imageReport),
-    chemicalsUsed: parseJsonArray<string>(row.chemicalsUsed),
-    completedAt: optionalString(row.completedAt)
-  };
-}
-
-function toInvoice(row: Record<string, unknown>): Invoice {
-  return {
-    id: String(row.id),
-    invoiceNo: String(row.invoiceNo),
-    customerName: String(row.customerName),
-    customerPhone: String(row.customerPhone),
-    address: String(row.address),
-    description: String(row.description),
-    amount: Number(row.amount),
-    vat: Number(row.vat),
-    totalAmount: Number(row.totalAmount),
-    status: row.status as Invoice['status'],
-    dueDate: String(row.dueDate),
-    createdAt: String(row.createdAt)
-  };
-}
-
-function toPackage(row: Record<string, unknown>): ServicePackage {
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    price: Number(row.price),
-    duration: String(row.duration),
-    description: String(row.description),
-    guarantee: String(row.guarantee),
-    features: parseJsonArray<string>(row.features)
-  };
-}
-
-async function dbCount(table: string, runner: QueryRunner = pool) {
-  const row = await queryOne<{ count: number }>(`SELECT COUNT(*) as count FROM ${table}`, [], runner);
-  return Number(row?.count ?? 0);
-}
-
-async function createSchema() {
-  await execute(
-    'CREATE TABLE IF NOT EXISTS users (id VARCHAR(64) PRIMARY KEY, username VARCHAR(191) NOT NULL, passwordHash TEXT NOT NULL, role VARCHAR(32) NOT NULL, displayName VARCHAR(255) NOT NULL, createdAt VARCHAR(64) NOT NULL, UNIQUE KEY unique_user_role (username, role)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS sessions (sessionId VARCHAR(64) PRIMARY KEY, role VARCHAR(32) NOT NULL, username VARCHAR(255) NOT NULL, displayName VARCHAR(255) NOT NULL, expiresAt BIGINT NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS packages (id VARCHAR(64) PRIMARY KEY, name TEXT NOT NULL, price INT NOT NULL, duration TEXT NOT NULL, description TEXT NOT NULL, guarantee TEXT NOT NULL, features JSON NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS problems (id VARCHAR(64) PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, pestType VARCHAR(64) NOT NULL, description TEXT NOT NULL, urgency VARCHAR(64) NOT NULL, createdAt VARCHAR(64) NOT NULL, status VARCHAR(64) NOT NULL, assignedTeam TEXT, appointmentDate VARCHAR(64)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS bookings (id VARCHAR(64) PRIMARY KEY, packageId VARCHAR(64) NOT NULL, packageName TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, bookingDate VARCHAR(64) NOT NULL, price INT NOT NULL, status VARCHAR(64) NOT NULL, invoiceNo VARCHAR(64)) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS contracts (id VARCHAR(64) PRIMARY KEY, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, packageName TEXT NOT NULL, startDate VARCHAR(64) NOT NULL, endDate VARCHAR(64) NOT NULL, totalVisits INT NOT NULL, completedVisits INT NOT NULL, nextVisitDate VARCHAR(64) NOT NULL, price INT NOT NULL, status VARCHAR(64) NOT NULL, documentNo VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS jobs (id VARCHAR(64) PRIMARY KEY, sourceId VARCHAR(64) NOT NULL, sourceType VARCHAR(32) NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, appointmentDate VARCHAR(64) NOT NULL, assignedTeam TEXT NOT NULL, status VARCHAR(64) NOT NULL, notesByTech TEXT, imageReport LONGTEXT, chemicalsUsed JSON, completedAt VARCHAR(64), createdAt VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
-  await execute(
-    'CREATE TABLE IF NOT EXISTS invoices (id VARCHAR(64) PRIMARY KEY, invoiceNo VARCHAR(64) NOT NULL, customerName TEXT NOT NULL, customerPhone TEXT NOT NULL, address TEXT NOT NULL, description TEXT NOT NULL, amount INT NOT NULL, vat INT NOT NULL, totalAmount INT NOT NULL, status VARCHAR(64) NOT NULL, dueDate VARCHAR(64) NOT NULL, createdAt VARCHAR(64) NOT NULL) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-  );
+async function createIndexes() {
+  await Promise.all([
+    users.createIndex({ username: 1, role: 1 }, { unique: true }),
+    sessions.createIndex({ sessionId: 1 }, { unique: true }),
+    sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    packagesCollection.createIndex({ id: 1 }, { unique: true }),
+    problemsCollection.createIndex({ id: 1 }, { unique: true }),
+    bookingsCollection.createIndex({ id: 1 }, { unique: true }),
+    contractsCollection.createIndex({ id: 1 }, { unique: true }),
+    jobsCollection.createIndex({ id: 1 }, { unique: true }),
+    invoicesCollection.createIndex({ id: 1 }, { unique: true })
+  ]);
 }
 
 async function getSession(req: express.Request) {
@@ -327,24 +176,15 @@ async function getSession(req: express.Request) {
 
   if (!sessionId) return null;
 
-  const row = await queryOne<Record<string, unknown>>(
-    'SELECT sessionId, role, username, displayName, expiresAt FROM sessions WHERE sessionId = ?',
-    [sessionId]
-  );
-
+  const row = await sessions.findOne({ sessionId }, { projection: { _id: 0 } });
   if (!row) return null;
-  if (Number(row.expiresAt) <= Date.now()) {
-    await execute('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
+
+  if (row.expiresAt <= Date.now()) {
+    await sessions.deleteOne({ sessionId });
     return null;
   }
 
-  return {
-    sessionId: String(row.sessionId),
-    role: row.role as PortalRole,
-    username: String(row.username),
-    displayName: String(row.displayName),
-    expiresAt: Number(row.expiresAt)
-  } satisfies SessionRow & { sessionId: string };
+  return row;
 }
 
 async function requireSession(req: express.Request, res: express.Response) {
@@ -358,22 +198,24 @@ async function requireSession(req: express.Request, res: express.Response) {
 
 async function createSession(role: PortalRole, username: string) {
   const sessionId = randomUUID();
-  const user = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [username, role]);
-  const displayName = user?.displayName ?? username;
-  const expiresAt = Date.now() + SESSION_TTL_MS;
-  await execute(
-    'INSERT INTO sessions (sessionId, role, username, displayName, expiresAt) VALUES (?, ?, ?, ?, ?)',
-    [sessionId, role, username, displayName, expiresAt]
-  );
-  return { sessionId, role, username, displayName, expiresAt };
+  const user = await users.findOne({ username, role }, { projection: { _id: 0 } });
+  const session: SessionRow = {
+    sessionId,
+    role,
+    username,
+    displayName: user?.displayName ?? username,
+    expiresAt: Date.now() + SESSION_TTL_MS
+  };
+  await sessions.insertOne(session);
+  return session;
 }
 
 async function clearSession(sessionId: string | null) {
   if (!sessionId) return;
-  await execute('DELETE FROM sessions WHERE sessionId = ?', [sessionId]);
+  await sessions.deleteOne({ sessionId });
 }
 
-async function createUser(username: string, password: string, role: PortalRole, displayName: string, runner: QueryRunner = pool) {
+async function createUser(username: string, password: string, role: PortalRole, displayName: string) {
   const user: UserRow = {
     id: randomUUID(),
     username,
@@ -383,196 +225,93 @@ async function createUser(username: string, password: string, role: PortalRole, 
     createdAt: new Date().toISOString()
   };
 
-  await execute(
-    'INSERT INTO users (id, username, passwordHash, role, displayName, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
-    [user.id, user.username, user.passwordHash, user.role, user.displayName, user.createdAt],
-    runner
-  );
-
+  await users.insertOne(user);
   return user;
 }
 
 async function seedDefaultUsers() {
   for (const account of DEFAULT_ACCOUNTS) {
-    const existing = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [account.username, account.role]);
+    const existing = await users.findOne({ username: account.username, role: account.role });
     if (existing) continue;
     await createUser(account.username, account.password, account.role, account.displayName);
   }
 }
 
 async function seedDatabase() {
-  await createSchema();
+  await createIndexes();
   await seedDefaultUsers();
-  if ((await dbCount('packages')) > 0) return;
 
-  await transaction(async (connection) => {
-    for (const pkg of INITIAL_PACKAGES) {
-      await execute(
-        'INSERT INTO packages (id, name, price, duration, description, guarantee, features) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [pkg.id, pkg.name, pkg.price, pkg.duration, pkg.description, pkg.guarantee, JSON.stringify(pkg.features)],
-        connection
-      );
-    }
+  if ((await packagesCollection.countDocuments()) > 0) return;
 
-    for (const problem of INITIAL_PROBLEMS) {
-      await execute(
-        'INSERT INTO problems (id, customerName, customerPhone, address, pestType, description, urgency, createdAt, status, assignedTeam, appointmentDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          problem.id,
-          problem.customerName,
-          problem.customerPhone,
-          problem.address,
-          problem.pestType,
-          problem.description,
-          problem.urgency,
-          problem.createdAt,
-          problem.status,
-          problem.assignedTeam ?? null,
-          problem.appointmentDate ?? null
-        ],
-        connection
-      );
-    }
-
-    for (const booking of INITIAL_BOOKINGS) {
-      await execute(
-        'INSERT INTO bookings (id, packageId, packageName, customerName, customerPhone, address, bookingDate, price, status, invoiceNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          booking.id,
-          booking.packageId,
-          booking.packageName,
-          booking.customerName,
-          booking.customerPhone,
-          booking.address,
-          booking.bookingDate,
-          booking.price,
-          booking.status,
-          booking.invoiceNo ?? null
-        ],
-        connection
-      );
-    }
-
-    for (const contract of INITIAL_CONTRACTS) {
-      await execute(
-        'INSERT INTO contracts (id, customerName, customerPhone, address, packageName, startDate, endDate, totalVisits, completedVisits, nextVisitDate, price, status, documentNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          contract.id,
-          contract.customerName,
-          contract.customerPhone,
-          contract.address,
-          contract.packageName,
-          contract.startDate,
-          contract.endDate,
-          contract.totalVisits,
-          contract.completedVisits,
-          contract.nextVisitDate,
-          contract.price,
-          contract.status,
-          contract.documentNo
-        ],
-        connection
-      );
-    }
-
-    for (const job of INITIAL_JOBS) {
-      await execute(
-        'INSERT INTO jobs (id, sourceId, sourceType, title, description, customerName, customerPhone, address, appointmentDate, assignedTeam, status, notesByTech, imageReport, chemicalsUsed, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          job.id,
-          job.sourceId,
-          job.sourceType,
-          job.title,
-          job.description,
-          job.customerName,
-          job.customerPhone,
-          job.address,
-          job.appointmentDate,
-          job.assignedTeam,
-          job.status,
-          job.notesByTech ?? null,
-          job.imageReport ?? null,
-          JSON.stringify(job.chemicalsUsed ?? []),
-          job.completedAt ?? null,
-          new Date().toISOString()
-        ],
-        connection
-      );
-    }
-
-    for (const invoice of INITIAL_INVOICES) {
-      await execute(
-        'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          invoice.id,
-          invoice.invoiceNo,
-          invoice.customerName,
-          invoice.customerPhone,
-          invoice.address,
-          invoice.description,
-          invoice.amount,
-          invoice.vat,
-          invoice.totalAmount,
-          invoice.status,
-          invoice.dueDate,
-          invoice.createdAt
-        ],
-        connection
-      );
-    }
-  });
+  await packagesCollection.insertMany(INITIAL_PACKAGES);
+  await problemsCollection.insertMany(INITIAL_PROBLEMS);
+  await bookingsCollection.insertMany(INITIAL_BOOKINGS);
+  await contractsCollection.insertMany(INITIAL_CONTRACTS);
+  await jobsCollection.insertMany(
+    INITIAL_JOBS.map((job) => ({
+      ...job,
+      chemicalsUsed: job.chemicalsUsed ?? [],
+      createdAt: new Date().toISOString()
+    }))
+  );
+  await invoicesCollection.insertMany(INITIAL_INVOICES);
 }
 
 async function getState() {
+  const [problems, bookings, contracts, jobs, invoices, packages] = await Promise.all([
+    problemsCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
+    bookingsCollection.find({}, { projection: { _id: 0 } }).sort({ id: -1 }).toArray(),
+    contractsCollection.find({}, { projection: { _id: 0 } }).sort({ startDate: -1 }).toArray(),
+    jobsCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
+    invoicesCollection.find({}, { projection: { _id: 0 } }).sort({ createdAt: -1 }).toArray(),
+    packagesCollection.find({}, { projection: { _id: 0 } }).sort({ id: 1 }).toArray()
+  ]);
+
   return {
-    problems: (await queryAll('SELECT * FROM problems ORDER BY createdAt DESC')).map(toProblem),
-    bookings: (await queryAll('SELECT * FROM bookings ORDER BY id DESC')).map(toBooking),
-    contracts: (await queryAll('SELECT * FROM contracts ORDER BY startDate DESC')).map(toContract),
-    jobs: (await queryAll('SELECT * FROM jobs ORDER BY createdAt DESC')).map(toJob),
-    invoices: (await queryAll('SELECT * FROM invoices ORDER BY createdAt DESC')).map(toInvoice),
-    packages: (await queryAll('SELECT * FROM packages ORDER BY id ASC')).map(toPackage)
+    problems,
+    bookings,
+    contracts,
+    jobs: jobs.map((job) => cleanMongo(job)),
+    invoices,
+    packages
   };
 }
 
 async function getSourceRecord(sourceType: 'problem' | 'booking', sourceId: string) {
   if (sourceType === 'problem') {
-    return queryOne<Record<string, unknown>>('SELECT * FROM problems WHERE id = ?', [sourceId]);
+    return problemsCollection.findOne({ id: sourceId }, { projection: { _id: 0 } });
   }
-  return queryOne<Record<string, unknown>>('SELECT * FROM bookings WHERE id = ?', [sourceId]);
+  return bookingsCollection.findOne({ id: sourceId }, { projection: { _id: 0 } });
 }
 
-async function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates: Partial<TechnicianJob> | undefined, runner: QueryRunner) {
-  await execute(
-    'UPDATE jobs SET status = ?, notesByTech = COALESCE(?, notesByTech), imageReport = COALESCE(?, imageReport), chemicalsUsed = COALESCE(?, chemicalsUsed), completedAt = COALESCE(?, completedAt) WHERE id = ?',
-    [
-      status,
-      updates?.notesByTech ?? null,
-      updates?.imageReport ?? null,
-      updates?.chemicalsUsed ? JSON.stringify(updates.chemicalsUsed) : null,
-      updates?.completedAt ?? null,
-      job.id
-    ],
-    runner
+async function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, updates?: Partial<TechnicianJob>) {
+  await jobsCollection.updateOne(
+    { id: job.id },
+    {
+      $set: {
+        status,
+        ...(updates?.notesByTech ? { notesByTech: updates.notesByTech } : {}),
+        ...(updates?.imageReport ? { imageReport: updates.imageReport } : {}),
+        ...(updates?.chemicalsUsed ? { chemicalsUsed: updates.chemicalsUsed } : {}),
+        ...(updates?.completedAt ? { completedAt: updates.completedAt } : {})
+      }
+    }
   );
 
   if (job.sourceType === 'problem') {
     const nextStatus = status === 'ส่งงานแล้ว' ? 'กำลังดำเนินการ' : status === 'เสร็จสิ้นและตรวจรับ' ? 'เสร็จสิ้น' : null;
-    if (nextStatus) {
-      await execute('UPDATE problems SET status = ? WHERE id = ?', [nextStatus, job.sourceId], runner);
-    }
+    if (nextStatus) await problemsCollection.updateOne({ id: job.sourceId }, { $set: { status: nextStatus } });
     return;
   }
 
   const nextStatus = status === 'ส่งงานแล้ว' ? 'กำลังจัดทีมงาน' : status === 'เสร็จสิ้นและตรวจรับ' ? 'เสร็จสิ้น' : null;
-  if (nextStatus) {
-    await execute('UPDATE bookings SET status = ? WHERE id = ?', [nextStatus, job.sourceId], runner);
-  }
+  if (nextStatus) await bookingsCollection.updateOne({ id: job.sourceId }, { $set: { status: nextStatus } });
 }
 
 await seedDatabase();
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'mysql' });
+  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'mongodb' });
 });
 
 app.get('/api/me', async (req, res) => {
@@ -600,7 +339,7 @@ app.post('/api/login', async (req, res) => {
   }
 
   const normalizedUsername = normalizeUsername(username);
-  const user = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [normalizedUsername, role]);
+  const user = await users.findOne({ username: normalizedUsername, role }, { projection: { _id: 0 } });
   if (!user || typeof password !== 'string' || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
@@ -644,7 +383,7 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
   }
 
-  const existing = await queryOne<UserRow>('SELECT * FROM users WHERE username = ? AND role = ?', [normalizedUsername, role]);
+  const existing = await users.findOne({ username: normalizedUsername, role });
   if (existing) {
     return res.status(409).json({ message: 'มีบัญชีนี้ในบทบาทที่เลือกแล้ว' });
   }
@@ -705,7 +444,7 @@ app.post('/api/problems', async (req, res) => {
   }
 
   const entry: PestProblem = {
-    id: makeId('prob', 100, await dbCount('problems')),
+    id: makeId('prob', 100, await dbCount(problemsCollection)),
     customerName,
     customerPhone,
     address,
@@ -716,22 +455,7 @@ app.post('/api/problems', async (req, res) => {
     status: 'รอดำเนินการ'
   };
 
-  await execute(
-    'INSERT INTO problems (id, customerName, customerPhone, address, pestType, description, urgency, createdAt, status, assignedTeam, appointmentDate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      entry.id,
-      entry.customerName,
-      entry.customerPhone,
-      entry.address,
-      entry.pestType,
-      entry.description,
-      entry.urgency,
-      entry.createdAt,
-      entry.status,
-      null,
-      null
-    ]
-  );
+  await problemsCollection.insertOne(entry);
 
   return res.json({ ok: true, problem: entry });
 });
@@ -744,8 +468,8 @@ app.post('/api/bookings', async (req, res) => {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
-  const bookingCount = await dbCount('bookings');
-  const invoiceCount = await dbCount('invoices');
+  const bookingCount = await dbCount(bookingsCollection);
+  const invoiceCount = await dbCount(invoicesCollection);
   const booking: Booking = {
     id: makeId('book', 200, bookingCount),
     packageId,
@@ -774,43 +498,8 @@ app.post('/api/bookings', async (req, res) => {
     createdAt: new Date().toISOString().split('T')[0]
   };
 
-  await transaction(async (connection) => {
-    await execute(
-      'INSERT INTO bookings (id, packageId, packageName, customerName, customerPhone, address, bookingDate, price, status, invoiceNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        booking.id,
-        booking.packageId,
-        booking.packageName,
-        booking.customerName,
-        booking.customerPhone,
-        booking.address,
-        booking.bookingDate,
-        booking.price,
-        booking.status,
-        booking.invoiceNo
-      ],
-      connection
-    );
-
-    await execute(
-      'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        invoice.id,
-        invoice.invoiceNo,
-        invoice.customerName,
-        invoice.customerPhone,
-        invoice.address,
-        invoice.description,
-        invoice.amount,
-        invoice.vat,
-        invoice.totalAmount,
-        invoice.status,
-        invoice.dueDate,
-        invoice.createdAt
-      ],
-      connection
-    );
-  });
+  await bookingsCollection.insertOne(booking);
+  await invoicesCollection.insertOne(invoice);
 
   return res.json({ ok: true, booking, invoice });
 });
@@ -827,57 +516,34 @@ app.post('/api/jobs/assign', async (req, res) => {
     return res.status(404).json({ message: 'ไม่พบรายการต้นทาง' });
   }
 
-  const job: TechnicianJob = {
-    id: makeId('job', 500, await dbCount('jobs')),
+  const job: JobDocument = {
+    id: makeId('job', 500, await dbCount(jobsCollection)),
     sourceId,
     sourceType,
     title,
     description: desc,
-    customerName: String(source.customerName),
-    customerPhone: String(source.customerPhone),
-    address: String(source.address),
+    customerName: source.customerName,
+    customerPhone: source.customerPhone,
+    address: source.address,
     appointmentDate: date,
     assignedTeam: teamName,
-    status: 'กำลังเตรียมตัว'
+    status: 'กำลังเตรียมตัว',
+    chemicalsUsed: [],
+    createdAt: new Date().toISOString()
   };
 
-  await transaction(async (connection) => {
-    await execute(
-      'INSERT INTO jobs (id, sourceId, sourceType, title, description, customerName, customerPhone, address, appointmentDate, assignedTeam, status, notesByTech, imageReport, chemicalsUsed, completedAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        job.id,
-        job.sourceId,
-        job.sourceType,
-        job.title,
-        job.description,
-        job.customerName,
-        job.customerPhone,
-        job.address,
-        job.appointmentDate,
-        job.assignedTeam,
-        job.status,
-        null,
-        null,
-        JSON.stringify([]),
-        null,
-        new Date().toISOString()
-      ],
-      connection
+  await jobsCollection.insertOne(job);
+
+  if (sourceType === 'problem') {
+    await problemsCollection.updateOne(
+      { id: sourceId },
+      { $set: { status: 'จัดสรรคิวช่างแล้ว', assignedTeam: teamName, appointmentDate: date } }
     );
+  } else {
+    await bookingsCollection.updateOne({ id: sourceId }, { $set: { status: 'กำลังจัดทีมงาน' } });
+  }
 
-    if (sourceType === 'problem') {
-      await execute('UPDATE problems SET status = ?, assignedTeam = ?, appointmentDate = ? WHERE id = ?', [
-        'จัดสรรคิวช่างแล้ว',
-        teamName,
-        date,
-        sourceId
-      ], connection);
-    } else {
-      await execute('UPDATE bookings SET status = ? WHERE id = ?', ['กำลังจัดทีมงาน', sourceId], connection);
-    }
-  });
-
-  return res.json({ ok: true, job });
+  return res.json({ ok: true, job: cleanMongo(job) });
 });
 
 app.patch('/api/jobs/:jobId/status', async (req, res) => {
@@ -888,28 +554,25 @@ app.patch('/api/jobs/:jobId/status', async (req, res) => {
     return res.status(400).json({ message: 'กรุณาระบุสถานะงาน' });
   }
 
-  const job = await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
+  const job = await jobsCollection.findOne({ id: jobId }, { projection: { _id: 0 } });
   if (!job) {
     return res.status(404).json({ message: 'ไม่พบงานช่าง' });
   }
 
-  await transaction(async (connection) => {
-    await syncJobSourceStatus(toJob(job), status as JobStatus, updates, connection);
-  });
+  await syncJobSourceStatus(job, status as JobStatus, updates);
 
-  return res.json({ ok: true, job: await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]) });
+  return res.json({ ok: true, job: await jobsCollection.findOne({ id: jobId }, { projection: { _id: 0 } }) });
 });
 
 app.post('/api/jobs/:jobId/approve', async (req, res) => {
   if (!(await requireSession(req, res))) return;
   const { jobId } = req.params;
-  const jobRow = await queryOne<Record<string, unknown>>('SELECT * FROM jobs WHERE id = ?', [jobId]);
-  if (!jobRow) {
+  const job = await jobsCollection.findOne({ id: jobId }, { projection: { _id: 0 } });
+  if (!job) {
     return res.status(404).json({ message: 'ไม่พบงานช่าง' });
   }
 
-  const job = toJob(jobRow);
-  const contractCount = await dbCount('contracts');
+  const contractCount = await dbCount(contractsCollection);
   const contract: Contract = {
     id: makeId('cont', 300, contractCount),
     customerName: job.customerName,
@@ -932,34 +595,13 @@ app.post('/api/jobs/:jobId/approve', async (req, res) => {
     documentNo: `CONT-2026-${300 + contractCount + 1}`
   };
 
-  await transaction(async (connection) => {
-    await execute('UPDATE jobs SET status = ? WHERE id = ?', ['เสร็จสิ้นและตรวจรับ', jobId], connection);
-    if (job.sourceType === 'problem') {
-      await execute('UPDATE problems SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId], connection);
-    } else {
-      await execute('UPDATE bookings SET status = ? WHERE id = ?', ['เสร็จสิ้น', job.sourceId], connection);
-    }
-
-    await execute(
-      'INSERT INTO contracts (id, customerName, customerPhone, address, packageName, startDate, endDate, totalVisits, completedVisits, nextVisitDate, price, status, documentNo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        contract.id,
-        contract.customerName,
-        contract.customerPhone,
-        contract.address,
-        contract.packageName,
-        contract.startDate,
-        contract.endDate,
-        contract.totalVisits,
-        contract.completedVisits,
-        contract.nextVisitDate,
-        contract.price,
-        contract.status,
-        contract.documentNo
-      ],
-      connection
-    );
-  });
+  await jobsCollection.updateOne({ id: jobId }, { $set: { status: 'เสร็จสิ้นและตรวจรับ' } });
+  if (job.sourceType === 'problem') {
+    await problemsCollection.updateOne({ id: job.sourceId }, { $set: { status: 'เสร็จสิ้น' } });
+  } else {
+    await bookingsCollection.updateOne({ id: job.sourceId }, { $set: { status: 'เสร็จสิ้น' } });
+  }
+  await contractsCollection.insertOne(contract);
 
   return res.json({ ok: true, contract });
 });
@@ -981,7 +623,7 @@ app.post('/api/invoices', async (req, res) => {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
-  const invoiceCount = await dbCount('invoices');
+  const invoiceCount = await dbCount(invoicesCollection);
   const invoice: Invoice = {
     id: makeId('inv', 400, invoiceCount),
     invoiceNo: `INV-2026-00${invoiceCount + 1}`,
@@ -997,23 +639,7 @@ app.post('/api/invoices', async (req, res) => {
     createdAt: new Date().toISOString().split('T')[0]
   };
 
-  await execute(
-    'INSERT INTO invoices (id, invoiceNo, customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [
-      invoice.id,
-      invoice.invoiceNo,
-      invoice.customerName,
-      invoice.customerPhone,
-      invoice.address,
-      invoice.description,
-      invoice.amount,
-      invoice.vat,
-      invoice.totalAmount,
-      invoice.status,
-      invoice.dueDate,
-      invoice.createdAt
-    ]
-  );
+  await invoicesCollection.insertOne(invoice);
 
   return res.json({ ok: true, invoice });
 });
@@ -1026,7 +652,7 @@ app.patch('/api/invoices/:invoiceId/status', async (req, res) => {
     return res.status(400).json({ message: 'กรุณาระบุสถานะใบแจ้งหนี้' });
   }
 
-  await execute('UPDATE invoices SET status = ? WHERE id = ?', [status, invoiceId]);
+  await invoicesCollection.updateOne({ id: invoiceId }, { $set: { status } });
 
   return res.json({ ok: true });
 });
