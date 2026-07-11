@@ -418,17 +418,17 @@ export default function App() {
 
   const routeShellConfig = {
     customer: {
-      title: 'Customer Service Portal',
+      title: 'NP Place Control Co., Ltd.',
       subtitle: 'งานแจ้งปัญหา จองบริการ และติดตามงานทั้งหมด',
       routeLabel: '/customer'
     },
     technician: {
-      title: 'Technician Field Portal',
+      title: 'NP Place Control Co., Ltd.',
       subtitle: 'ตารางงานช่าง รายงานหน้างาน และอัปเดตสถานะ',
       routeLabel: '/technician'
     },
     user: {
-      title: 'User Operations Portal',
+      title: 'NP Place Control Co., Ltd.',
       subtitle: 'ศูนย์ควบคุมคำสั่งงาน แผนงาน และการเงิน',
       routeLabel: '/user'
     }

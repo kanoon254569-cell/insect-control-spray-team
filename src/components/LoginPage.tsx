@@ -98,7 +98,7 @@ export default function LoginPage({ onLogin, loading, error }: LoginPageProps) {
             </div>
             <div>
               <div className="text-[11px] font-black uppercase tracking-[0.24em] text-slate-500">
-                Insect Control Spray Team
+                NP Place Control Co., Ltd.
               </div>
               <h1 className="text-2xl font-black tracking-tight text-slate-900">
                 เข้าสู่ระบบ

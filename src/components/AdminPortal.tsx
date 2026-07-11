@@ -959,7 +959,7 @@ export default function AdminPortal({
                 <div>
                   <h2 className="text-md font-extrabold text-slate-800 uppercase flex items-center">
                     <Building className="w-5 h-5 mr-1.5 text-amber-600" />
-                    <span>บจก. คอนโทรลสเปรย์ (ประเทศไทย)</span>
+                    <span>NP Place Control Co., Ltd.</span>
                   </h2>
                   <p className="text-[10px] text-slate-400 mt-1">12/99 ถนนรัชดาภิเษก แขวงห้วยขวาง กรุงเทพฯ 10310</p>
                   <p className="text-[10px] text-slate-400">โทร. 02-123-4567 | เลขประจำตัวผู้เสียภาษี: 0105566023841</p>

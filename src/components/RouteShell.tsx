@@ -13,15 +13,15 @@ interface RouteShellProps {
 
 const ROLE_META: Record<PortalRole, { badge: string; gradient: string }> = {
   customer: {
-    badge: 'Customer Workspace',
+    badge: 'NP Place Control Co., Ltd.',
     gradient: 'from-amber-600 via-orange-500 to-slate-900'
   },
   technician: {
-    badge: 'Technician Workspace',
+    badge: 'NP Place Control Co., Ltd.',
     gradient: 'from-slate-900 via-slate-800 to-amber-800'
   },
   user: {
-    badge: 'User Workspace',
+    badge: 'NP Place Control Co., Ltd.',
     gradient: 'from-amber-700 via-slate-900 to-slate-950'
   }
 };
