@@ -33,7 +33,23 @@ const __dirname = path.dirname(__filename);
 const SESSION_COOKIE = 'bugguard_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
-const databaseUrl = process.env.MYSQL_URL ?? process.env.DATABASE_URL;
+function getMysqlUrl() {
+  if (process.env.MYSQL_URL) return process.env.MYSQL_URL;
+  if (process.env.DATABASE_URL?.startsWith('mysql://') || process.env.DATABASE_URL?.startsWith('mysql2://')) {
+    return process.env.DATABASE_URL;
+  }
+  return null;
+}
+
+const databaseUrl = getMysqlUrl();
+const hasMysqlFieldConfig = Boolean(process.env.MYSQL_HOST || process.env.MYSQL_USER || process.env.MYSQL_DATABASE);
+
+if (!databaseUrl && !hasMysqlFieldConfig && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
+  throw new Error(
+    'Missing MySQL configuration. Set MYSQL_URL on Render, for example mysql://USER:PASSWORD@HOST:3306/insect_control_spray_team'
+  );
+}
+
 const pool = databaseUrl
   ? mysql.createPool(databaseUrl)
   : mysql.createPool({
