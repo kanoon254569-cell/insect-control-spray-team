@@ -435,6 +435,58 @@ export default function App() {
     showToast(`อัปเดตยอดชำระเงินเรียบร้อย บันทึกเข้าบัญชีส่วนกลาง`);
   };
 
+  // 8. Admin: Add Team Member
+  const handleAddTeamMember = async (member: Omit<TeamMember, 'id' | 'createdAt'>) => {
+    const response = await fetch('/api/team-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(member)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'เพิ่มสมาชิกทีมไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`เพิ่ม ${member.name} เข้าทีมงานเรียบร้อย`);
+  };
+
+  // 9. Admin: Update Team Member
+  const handleUpdateTeamMember = async (memberId: string, updates: Partial<TeamMember>) => {
+    const response = await fetch(`/api/team-members/${memberId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'อัปเดตข้อมูลสมาชิกไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`อัปเดตข้อมูลสมาชิกทีมเรียบร้อย`);
+  };
+
+  // 10. Admin: Delete Team Member
+  const handleDeleteTeamMember = async (memberId: string) => {
+    const response = await fetch(`/api/team-members/${memberId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'ลบสมาชิกทีมไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`ลบสมาชิกทีมออกเรียบร้อย`);
+  };
+
   if (bootLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fff6db_0%,#f8fafc_35%,#eef2ff_100%)] text-slate-700">
@@ -567,15 +619,9 @@ export default function App() {
                   onAddInvoice={handleAddInvoice}
                   onUpdateInvoiceStatus={handleUpdateInvoiceStatus}
                   onApproveJobCompletion={handleApproveJobCompletion}
-                  onAddTeamMember={(member) => {
-                    // Will be implemented in AdminPortal
-                  }}
-                  onUpdateTeamMember={(memberId, updates) => {
-                    // Will be implemented in AdminPortal
-                  }}
-                  onDeleteTeamMember={(memberId) => {
-                    // Will be implemented in AdminPortal
-                  }}
+                  onAddTeamMember={handleAddTeamMember}
+                  onUpdateTeamMember={handleUpdateTeamMember}
+                  onDeleteTeamMember={handleDeleteTeamMember}
                 />
               )}
             </motion.div>
