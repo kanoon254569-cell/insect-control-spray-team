@@ -314,6 +314,27 @@ export default function App() {
   // --- ACTIONS INTERFACES ---
 
   // 1. Customer: Add Pest Problem Ticket
+  const handleUploadPaymentReceipt = async (
+    invoiceId: string,
+    payload: { amount: number; payerName: string; transferTime: string; receiptDataUrl: string }
+  ) => {
+    const response = await fetch(`/api/invoices/${invoiceId}/receipt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'อัปโหลดสลิปไม่สำเร็จ');
+    }
+
+    const data = await response.json();
+    await loadServerState();
+    showToast(data.message || 'สลิปถูกยืนยันและสถานะชำระเงินอัปเดตแล้ว', 'success');
+  };
+
   const handleAddProblem = async (newProb: {
     customerName: string;
     customerPhone: string;
@@ -661,6 +682,8 @@ export default function App() {
                   onAddBooking={handleAddBooking}
                   contracts={contracts}
                   jobs={jobs}
+                  invoices={invoices}
+                  onUploadPaymentReceipt={handleUploadPaymentReceipt}
                 />
               )}
 

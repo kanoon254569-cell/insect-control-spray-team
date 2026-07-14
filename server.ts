@@ -5,6 +5,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createWorker } from 'tesseract.js';
 import {
   INITIAL_PROBLEMS,
   INITIAL_BOOKINGS,
@@ -14,6 +15,7 @@ import {
   INITIAL_PACKAGES
 } from './src/data';
 import { resolvePortalRole } from './src/auth';
+import { extractReceiptMetadata } from './src/payment';
 import type {
   Booking,
   Contract,
@@ -96,6 +98,28 @@ const bookingsCollection = database.collection<Booking>('bookings');
 const contractsCollection = database.collection<Contract>('contracts');
 const jobsCollection = database.collection<JobDocument>('jobs');
 const invoicesCollection = database.collection<Invoice>('invoices');
+
+async function analyzeReceiptImage(dataUrl: string) {
+  if (!dataUrl.startsWith('data:image/')) {
+    return { amount: null, payerName: null, transferTime: null, rawText: '' };
+  }
+
+  try {
+    const worker = await createWorker('eng');
+    const { data } = await worker.recognize(dataUrl);
+    await worker.terminate();
+    const metadata = extractReceiptMetadata(data.text);
+    return {
+      amount: metadata.amount,
+      payerName: metadata.payerName,
+      transferTime: metadata.transferTime,
+      rawText: data.text
+    };
+  } catch (error) {
+    console.error('Receipt OCR failed', error);
+    return { amount: null, payerName: null, transferTime: null, rawText: '' };
+  }
+}
 
 function serializeCookie(
   name: string,
@@ -571,6 +595,55 @@ app.post('/api/bookings', async (req, res) => {
   await invoicesCollection.insertOne(invoice);
 
   return res.json({ ok: true, booking, invoice });
+});
+
+app.post('/api/receipts/ocr', async (req, res) => {
+  const { dataUrl } = req.body ?? {};
+
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) {
+    return res.status(400).json({ message: 'กรุณาอัปโหลดภาพสลิปก่อน' });
+  }
+
+  const metadata = await analyzeReceiptImage(dataUrl);
+  return res.json({ ok: true, metadata });
+});
+
+app.post('/api/invoices/:invoiceId/receipt', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+
+  const { invoiceId } = req.params;
+  const { amount, payerName, transferTime, receiptDataUrl } = req.body ?? {};
+  const numericAmount = Number(amount);
+
+  if (!invoiceId || !payerName || !transferTime || !receiptDataUrl || Number.isNaN(numericAmount)) {
+    return res.status(400).json({ message: 'กรุณากรอกข้อมูลสลิปให้ครบถ้วน' });
+  }
+
+  const invoice = await invoicesCollection.findOne({ id: invoiceId }, { projection: { _id: 0 } });
+  if (!invoice) {
+    return res.status(404).json({ message: 'ไม่พบใบแจ้งหนี้นี้' });
+  }
+
+  const amountMatches = Math.abs(numericAmount - invoice.totalAmount) <= 50;
+  if (!amountMatches) {
+    return res.status(400).json({ message: 'จำนวนเงินในสลิปไม่ตรงกับใบแจ้งหนี้' });
+  }
+
+  await invoicesCollection.updateOne(
+    { id: invoiceId },
+    {
+      $set: {
+        status: 'ชำระเงินแล้ว',
+        receiptDataUrl,
+        payerName,
+        transferTime,
+        paymentVerifiedAt: new Date().toISOString(),
+        paymentReference: `OCR-${Date.now()}`
+      }
+    }
+  );
+
+  return res.json({ ok: true, message: 'สลิปตรวจสอบแล้วและสถานะชำระเงินอัปเดตเป็น Paid แล้ว' });
 });
 
 app.post('/api/jobs/assign', async (req, res) => {

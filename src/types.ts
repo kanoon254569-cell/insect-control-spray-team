@@ -109,6 +109,11 @@ export interface Invoice {
   status: 'ค้างชำระ' | 'ชำระเงินแล้ว';
   dueDate: string;
   createdAt: string;
+  receiptDataUrl?: string;
+  payerName?: string;
+  transferTime?: string;
+  paymentVerifiedAt?: string;
+  paymentReference?: string;
 }
 
 export type PortalRole = 'customer' | 'technician' | 'user';

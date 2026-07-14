@@ -12,10 +12,15 @@ import {
   Activity,
   ArrowRight,
   Clipboard,
-  Droplet
+  Droplet,
+  CreditCard,
+  QrCode,
+  Upload,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, PestType } from '../types';
+import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, PestType, Invoice } from '../types';
+import { buildPromptPayPayload, extractReceiptMetadata } from '../payment';
 
 interface CustomerPortalProps {
   problems: PestProblem[];
@@ -40,6 +45,8 @@ interface CustomerPortalProps {
   }) => Promise<void> | void;
   contracts: Contract[];
   jobs: TechnicianJob[];
+  invoices: Invoice[];
+  onUploadPaymentReceipt: (invoiceId: string, payload: { amount: number; payerName: string; transferTime: string; receiptDataUrl: string }) => Promise<void> | void;
 }
 
 export default function CustomerPortal({
@@ -49,9 +56,11 @@ export default function CustomerPortal({
   bookings,
   onAddBooking,
   contracts,
-  jobs
+  jobs,
+  invoices,
+  onUploadPaymentReceipt
 }: CustomerPortalProps) {
-  const [activeTab, setActiveTab] = useState<'catalog' | 'report' | 'tracking' | 'contracts'>('catalog');
+  const [activeTab, setActiveTab] = useState<'catalog' | 'report' | 'tracking' | 'contracts' | 'payments'>('catalog');
   
   // State for Problem Report Form
   const [reportForm, setReportForm] = useState({
@@ -79,6 +88,12 @@ export default function CustomerPortal({
   // Selected job for tracking details
   const [selectedTrackJobId, setSelectedTrackJobId] = useState<string | null>(null);
   const [expandedReportPhoto, setExpandedReportPhoto] = useState<string | null>(null);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string>('');
+  const [paymentForm, setPaymentForm] = useState({ amount: '', payerName: '', transferTime: '', receiptDataUrl: '' });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,6 +123,83 @@ export default function CustomerPortal({
     } finally {
       setReportLoading(false);
     }
+  };
+
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (paymentLoading) return;
+    if (!paymentInvoiceId || !paymentForm.amount || !paymentForm.payerName || !paymentForm.transferTime || !paymentForm.receiptDataUrl) {
+      alert('กรุณากรอกข้อมูลสลิปให้ครบถ้วน');
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      await onUploadPaymentReceipt(paymentInvoiceId, {
+        amount: Number(paymentForm.amount),
+        payerName: paymentForm.payerName,
+        transferTime: paymentForm.transferTime,
+        receiptDataUrl: paymentForm.receiptDataUrl
+      });
+      setPaymentSuccess(true);
+      setTimeout(() => {
+        setPaymentSuccess(false);
+        setPaymentInvoiceId('');
+        setPaymentForm({ amount: '', payerName: '', transferTime: '', receiptDataUrl: '' });
+      }, 2000);
+    } catch {
+      alert('อัปโหลดสลิปไม่สำเร็จ');
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const handleReceiptUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      event.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      setPaymentForm(prev => ({ ...prev, receiptDataUrl: dataUrl }));
+      setOcrStatus('กำลังวิเคราะห์ภาพสลิปด้วย OCR จากเซิร์ฟเวอร์...');
+
+      try {
+        const response = await fetch('/api/receipts/ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl })
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.message || 'OCR failed');
+        }
+
+        const metadata = payload.metadata ?? {};
+        setPaymentForm((prev) => ({
+          ...prev,
+          amount: metadata.amount ? String(metadata.amount) : prev.amount,
+          payerName: metadata.payerName || prev.payerName,
+          transferTime: metadata.transferTime || prev.transferTime,
+          receiptDataUrl: dataUrl
+        }));
+        setOcrStatus('OCR สำเร็จ: ระบบอ่านข้อมูลจากภาพสลิปจริงผ่าน backend');
+      } catch {
+        setPaymentForm((prev) => ({
+          ...prev,
+          amount: selectedInvoice?.totalAmount?.toString() || prev.amount,
+          receiptDataUrl: dataUrl
+        }));
+        setOcrStatus('OCR ล้มเหลว: ใช้ข้อมูลใบแจ้งหนี้เป็นค่าเริ่มต้น');
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -202,6 +294,19 @@ export default function CustomerPortal({
                   {problems.filter(p => p.status !== 'เสร็จสิ้น').length + bookings.filter(b => b.status !== 'เสร็จสิ้น').length}
                 </span>
               )}
+            </button>
+            
+            <button
+              id="tab-payments"
+              onClick={() => setActiveTab('payments')}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'payments'
+                  ? 'bg-amber-50 text-amber-700 border-l-4 border-amber-600 pl-3'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <CreditCard className="w-4 h-4 text-amber-600" />
+              <span>ชำระเงิน / อัปโหลดสลิป</span>
             </button>
             
             <button
@@ -848,6 +953,177 @@ export default function CustomerPortal({
                   </div>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* TAB 4: PAYMENT / RECEIPT */}
+          {activeTab === 'payments' && (
+            <motion.div
+              key="payments"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">ชำระเงินด้วย PromptPay และอัปโหลดสลิป</h2>
+                <p className="text-xs text-slate-500 mt-1">สร้าง QR สำหรับการชำระเงินและส่งสลิปเพื่อยืนยันการชำระด้วยตัวเอง</p>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6 space-y-4">
+                  <div className="flex items-center gap-2 text-amber-700">
+                    <QrCode className="w-5 h-5" />
+                    <h3 className="font-bold">PromptPay QR</h3>
+                  </div>
+                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 p-4 text-center text-sm text-slate-700">
+                    <div className="mx-auto mb-3 flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm">
+                      <QrCode className="h-10 w-10 text-amber-600" />
+                    </div>
+                    <p className="font-semibold">โอนเงินไปที่เลขพร้อมเพย์</p>
+                    <p className="mt-1 font-mono text-base font-bold text-amber-700">066-132-7370</p>
+                    <p className="mt-2 text-xs text-slate-500">จำนวนเงินจะถูกกำหนดตามใบแจ้งหนี้ของคุณโดยอัตโนมัติ</p>
+                    <div className="mt-3 rounded-xl bg-white p-3 text-left text-[11px] text-slate-600">
+                      <div className="font-semibold text-slate-700">QR payload สำหรับการทดสอบ</div>
+                      <div className="mt-1 break-all font-mono text-[10px] text-slate-500">
+                        {buildPromptPayPayload('0661327370', Number(paymentForm.amount) || selectedInvoice?.totalAmount || 0)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                    <div className="flex justify-between">
+                      <span>ชื่อบริษัท</span>
+                      <span className="font-semibold">NP Place Control Co., Ltd.</span>
+                    </div>
+                    <div className="mt-1 flex justify-between">
+                      <span>ช่องทางชำระ</span>
+                      <span className="font-semibold">PromptPay / Mobile Banking</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
+                  <div className="flex items-center gap-2 text-emerald-700">
+                    <Upload className="w-5 h-5" />
+                    <h3 className="font-bold">อัปโหลดสลิปชำระเงิน</h3>
+                  </div>
+
+                  {paymentSuccess ? (
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center text-sm text-emerald-800">
+                      <CheckCircle className="mx-auto mb-2 h-8 w-8" />
+                      <p className="font-semibold">ส่งสลิปเรียบร้อยแล้ว</p>
+                      <p className="mt-1 text-xs">ระบบจะตรวจยอดและเปลี่ยนสถานะเป็น Paid อัตโนมัติ</p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handlePaymentSubmit} className="mt-4 space-y-4">
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-slate-700">เลือกใบแจ้งหนี้</label>
+                        <select
+                          value={paymentInvoiceId}
+                          onChange={(e) => {
+                            const nextInvoiceId = e.target.value;
+                            setPaymentInvoiceId(nextInvoiceId);
+                            const invoice = invoices.find((item) => item.id === nextInvoiceId) || null;
+                            setSelectedInvoice(invoice);
+                            if (invoice) {
+                              setPaymentForm((prev) => ({ ...prev, amount: invoice.totalAmount.toString() }));
+                            }
+                          }}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                        >
+                          <option value="">-- เลือกใบแจ้งหนี้ --</option>
+                          {invoices.map((invoice) => (
+                            <option key={invoice.id} value={invoice.id}>
+                              {invoice.invoiceNo} — {invoice.totalAmount.toLocaleString()} บาท — {invoice.status}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-slate-700">จำนวนเงิน</label>
+                          <input
+                            type="number"
+                            value={paymentForm.amount}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                            placeholder="เช่น 12000"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-bold text-slate-700">ชื่อผู้โอน</label>
+                          <input
+                            type="text"
+                            value={paymentForm.payerName}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, payerName: e.target.value })}
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                            placeholder="ชื่อ-นามสกุล"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-slate-700">เวลาโอน</label>
+                        <input
+                          type="datetime-local"
+                          value={paymentForm.transferTime}
+                          onChange={(e) => setPaymentForm({ ...paymentForm, transferTime: e.target.value })}
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-xs font-bold text-slate-700">อัปโหลดสลิป</label>
+                        <input type="file" accept="image/*" onChange={handleReceiptUpload} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" />
+                        {ocrStatus && <p className="mt-2 text-[11px] text-amber-700">{ocrStatus}</p>}
+                        {paymentForm.receiptDataUrl && (
+                          <img src={paymentForm.receiptDataUrl} alt="receipt preview" className="mt-3 h-40 w-full rounded-xl object-cover" />
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={paymentLoading}
+                        className="w-full rounded-xl bg-amber-600 px-4 py-3 text-sm font-bold text-white hover:bg-amber-700 disabled:opacity-70"
+                      >
+                        {paymentLoading ? 'กำลังยืนยัน...' : 'ส่งสลิปเพื่อยืนยันชำระเงิน'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Receipt className="w-5 h-5" />
+                  <h3 className="font-bold">สถานะใบแจ้งหนี้ของคุณ</h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {invoices.length === 0 ? (
+                    <p className="text-sm text-slate-500">ยังไม่มีใบแจ้งหนี้ในขณะนี้</p>
+                  ) : (
+                    invoices.map((invoice) => (
+                      <div key={invoice.id} className="rounded-xl border border-slate-100 p-4">
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="text-sm font-bold text-slate-800">{invoice.invoiceNo}</p>
+                            <p className="text-xs text-slate-500">{invoice.description}</p>
+                          </div>
+                          <div className="text-sm font-bold text-amber-700">฿{invoice.totalAmount.toLocaleString()}</div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                          <span className={`rounded-full px-2.5 py-1 font-bold ${invoice.status === 'ชำระเงินแล้ว' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {invoice.status}
+                          </span>
+                          {invoice.payerName && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">ผู้โอน: {invoice.payerName}</span>}
+                          {invoice.transferTime && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">เวลา: {invoice.transferTime}</span>}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </motion.div>
           )}
 
