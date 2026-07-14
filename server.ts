@@ -966,6 +966,24 @@ app.delete('/api/team-members/:memberId', async (req, res) => {
   return res.json({ ok: true });
 });
 
+// Contract Management Endpoints
+app.patch('/api/contracts/:contractId', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { contractId } = req.params;
+  const updates = req.body ?? {};
+
+  await contractsCollection.updateOne({ id: contractId }, { $set: updates });
+  return res.json({ ok: true });
+});
+
+app.delete('/api/contracts/:contractId', async (req, res) => {
+  if (!(await requireSession(req, res))) return;
+  const { contractId } = req.params;
+
+  await contractsCollection.deleteOne({ id: contractId });
+  return res.json({ ok: true });
+});
+
 app.post('/api/reload', async (req, res) => {
   if (!(await requireSession(req, res))) return;
   return res.json(await getState());

@@ -49,6 +49,8 @@ interface AdminPortalProps {
   onDeleteTeamMember: (memberId: string) => Promise<void> | void;
   onAddTeam: (team: Omit<Team, 'id' | 'createdAt'>) => Promise<void> | void;
   onUpdateTeam: (teamId: string, updates: Partial<Team>) => Promise<void> | void;
+  onUpdateContract: (contractId: string, updates: Partial<Contract>) => Promise<void> | void;
+  onDeleteContract: (contractId: string) => Promise<void> | void;
 }
 
 export default function AdminPortal({
@@ -68,9 +70,11 @@ export default function AdminPortal({
   onUpdateTeamMember,
   onDeleteTeamMember,
   onAddTeam,
-  onUpdateTeam
+  onUpdateTeam,
+  onUpdateContract,
+  onDeleteContract
 }: AdminPortalProps) {
-  const [adminTab, setAdminTab] = useState<'dashboard' | 'assignments' | 'billing' | 'history' | 'team'>('dashboard');
+  const [adminTab, setAdminTab] = useState<'dashboard' | 'assignments' | 'billing' | 'history' | 'team' | 'contracts'>('dashboard');
 
   // Dispatch/Scheduling form states
   const [selectedSourceId, setSelectedSourceId] = useState<string>('');
@@ -121,6 +125,25 @@ export default function AdminPortal({
   const [invoiceActionLoadingId, setInvoiceActionLoadingId] = useState<string | null>(null);
   const [jobApprovalLoadingId, setJobApprovalLoadingId] = useState<string | null>(null);
   const [memberDeleteLoadingId, setMemberDeleteLoadingId] = useState<string | null>(null);
+
+  // Contract management states
+  const [editingContractId, setEditingContractId] = useState<string | null>(null);
+  const [contractForm, setContractForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    address: '',
+    packageName: '',
+    totalVisits: 12,
+    completedVisits: 0,
+    nextVisitDate: '',
+    startDate: '',
+    endDate: '',
+    status: 'เปิดใช้งาน' as const,
+    price: 12000
+  });
+  const [contractUpdateLoading, setContractUpdateLoading] = useState(false);
+  const [contractDeleteLoadingId, setContractDeleteLoadingId] = useState<string | null>(null);
+  const [contractSuccess, setContractSuccess] = useState(false);
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -302,6 +325,17 @@ export default function AdminPortal({
         >
           <Users className="w-4 h-4" />
           <span>ตั้งค่าบัญชี-ลูกน้อง</span>
+        </button>
+        <button
+          onClick={() => setAdminTab('contracts')}
+          className={`px-5 py-3 text-xs font-bold transition-colors border-b-2 flex items-center space-x-2 ${
+            adminTab === 'contracts'
+              ? 'border-amber-600 text-amber-700'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileText className="w-4 h-4" />
+          <span>จัดการสัญญา</span>
         </button>
       </div>
 
@@ -1614,6 +1648,320 @@ export default function AdminPortal({
                 <span>สั่งพิมพ์เอกสาร</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: CONTRACT MANAGEMENT */}
+      {adminTab === 'contracts' && (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Edit Contract Form */}
+          <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-100 shadow-xs h-fit space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-800 pb-2 border-b border-slate-100 flex items-center">
+              <FileText className="w-4.5 h-4.5 text-amber-600 mr-1.5" />
+              <span>{editingContractId ? 'แก้ไขสัญญา' : 'ค้นหาสัญญา'}</span>
+            </h3>
+
+            {editingContractId ? (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!editingContractId) return;
+                  try {
+                    setContractUpdateLoading(true);
+                    await onUpdateContract(editingContractId, {
+                      customerName: contractForm.customerName,
+                      customerPhone: contractForm.customerPhone,
+                      address: contractForm.address,
+                      packageName: contractForm.packageName,
+                      totalVisits: contractForm.totalVisits,
+                      completedVisits: contractForm.completedVisits,
+                      nextVisitDate: contractForm.nextVisitDate,
+                      startDate: contractForm.startDate,
+                      endDate: contractForm.endDate,
+                      status: contractForm.status,
+                      price: contractForm.price
+                    });
+                    setContractSuccess(true);
+                    setTimeout(() => setContractSuccess(false), 2000);
+                    setEditingContractId(null);
+                    setContractForm({
+                      customerName: '',
+                      customerPhone: '',
+                      address: '',
+                      packageName: '',
+                      totalVisits: 12,
+                      completedVisits: 0,
+                      nextVisitDate: '',
+                      startDate: '',
+                      endDate: '',
+                      status: 'เปิดใช้งาน',
+                      price: 12000
+                    });
+                  } catch {
+                    alert('อัปเดตสัญญาไม่สำเร็จ');
+                  } finally {
+                    setContractUpdateLoading(false);
+                  }
+                }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ชื่อลูกค้า</label>
+                  <input
+                    type="text"
+                    value={contractForm.customerName}
+                    onChange={(e) => setContractForm({ ...contractForm, customerName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">เบอร์โทร</label>
+                  <input
+                    type="tel"
+                    value={contractForm.customerPhone}
+                    onChange={(e) => setContractForm({ ...contractForm, customerPhone: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ที่อยู่</label>
+                  <textarea
+                    value={contractForm.address}
+                    onChange={(e) => setContractForm({ ...contractForm, address: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ชื่อแพ็กเกจ</label>
+                  <input
+                    type="text"
+                    value={contractForm.packageName}
+                    onChange={(e) => setContractForm({ ...contractForm, packageName: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">เยี่ยมทั้งหมด</label>
+                    <input
+                      type="number"
+                      value={contractForm.totalVisits}
+                      onChange={(e) => setContractForm({ ...contractForm, totalVisits: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">เยี่ยมแล้ว</label>
+                    <input
+                      type="number"
+                      value={contractForm.completedVisits}
+                      onChange={(e) => setContractForm({ ...contractForm, completedVisits: parseInt(e.target.value) || 0 })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">วันเริ่มต้น</label>
+                    <input
+                      type="date"
+                      value={contractForm.startDate}
+                      onChange={(e) => setContractForm({ ...contractForm, startDate: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">วันสิ้นสุด</label>
+                    <input
+                      type="date"
+                      value={contractForm.endDate}
+                      onChange={(e) => setContractForm({ ...contractForm, endDate: e.target.value })}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">วันเยี่ยมถัดไป</label>
+                  <input
+                    type="date"
+                    value={contractForm.nextVisitDate}
+                    onChange={(e) => setContractForm({ ...contractForm, nextVisitDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">ราคา</label>
+                  <input
+                    type="number"
+                    value={contractForm.price}
+                    onChange={(e) => setContractForm({ ...contractForm, price: parseInt(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">สถานะ</label>
+                  <select
+                    value={contractForm.status}
+                    onChange={(e) => setContractForm({ ...contractForm, status: e.target.value as 'เปิดใช้งาน' | 'เสร็จสิ้นแล้ว' | 'ระงับชั่วคราว' })}
+                    className="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl"
+                  >
+                    <option value="เปิดใช้งาน">เปิดใช้งาน</option>
+                    <option value="เสร็จสิ้นแล้ว">เสร็จสิ้นแล้ว</option>
+                    <option value="ระงับชั่วคราว">ระงับชั่วคราว</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    disabled={contractUpdateLoading}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs py-2 rounded-xl transition disabled:opacity-70"
+                  >
+                    {contractUpdateLoading ? 'กำลังบันทึก...' : 'อัปเดต'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingContractId(null);
+                      setContractForm({
+                        customerName: '',
+                        customerPhone: '',
+                        address: '',
+                        packageName: '',
+                        totalVisits: 12,
+                        completedVisits: 0,
+                        nextVisitDate: '',
+                        startDate: '',
+                        endDate: '',
+                        status: 'เปิดใช้งาน',
+                        price: 12000
+                      });
+                    }}
+                    className="px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl"
+                  >
+                    ยกเลิก
+                  </button>
+                </div>
+
+                {contractSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2 rounded-xl text-xs font-semibold">
+                    ✓ อัปเดตสัญญาสำเร็จ
+                  </div>
+                )}
+              </form>
+            ) : (
+              <div className="text-xs text-slate-500">
+                เลือกสัญญาที่ต้องการแก้ไขจากตารางด้านขวา
+              </div>
+            )}
+          </div>
+
+          {/* Contracts Table */}
+          <div className="lg:col-span-3 bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-800 pb-2 border-b border-slate-100">
+              ทะเบียนสัญญาและดูแลระยะยาว
+            </h3>
+
+            <div className="overflow-x-auto border border-slate-100 rounded-xl">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-600 text-left border-b border-slate-100">
+                  <tr>
+                    <th className="p-3">เลขที่สัญญา</th>
+                    <th className="p-3">ชื่อลูกค้า</th>
+                    <th className="p-3">บริการ</th>
+                    <th className="p-3">เยี่ยม</th>
+                    <th className="p-3">สถานะ</th>
+                    <th className="p-3">เยี่ยมถัดไป</th>
+                    <th className="p-3">จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {contracts.map((contract) => (
+                    <tr key={contract.id} className="hover:bg-slate-50/55">
+                      <td className="p-3 font-mono font-bold text-slate-700">{contract.documentNo}</td>
+                      <td className="p-3">
+                        <div className="font-semibold text-slate-800">{contract.customerName}</div>
+                        <div className="text-[10px] text-slate-500">{contract.customerPhone}</div>
+                      </td>
+                      <td className="p-3 font-bold text-slate-700 truncate max-w-[120px]">{contract.packageName}</td>
+                      <td className="p-3 font-mono font-bold text-slate-600">
+                        {contract.completedVisits}/{contract.totalVisits}
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          contract.status === 'เปิดใช้งาน'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : contract.status === 'ระงับชั่วคราว'
+                            ? 'bg-amber-100 text-amber-900'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {contract.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-slate-600 text-[10px]">{contract.nextVisitDate}</td>
+                      <td className="p-3 flex gap-1.5">
+                        <button
+                          onClick={() => {
+                            setEditingContractId(contract.id);
+                            setContractForm({
+                              customerName: contract.customerName,
+                              customerPhone: contract.customerPhone,
+                              address: contract.address,
+                              packageName: contract.packageName,
+                              totalVisits: contract.totalVisits,
+                              completedVisits: contract.completedVisits,
+                              nextVisitDate: contract.nextVisitDate,
+                              startDate: contract.startDate,
+                              endDate: contract.endDate,
+                              status: contract.status,
+                              price: contract.price
+                            });
+                          }}
+                          className="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 font-bold rounded text-[9px]"
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (contractDeleteLoadingId !== null) return;
+                            if (confirm(`คุณแน่ใจที่จะลบสัญญา ${contract.documentNo} หรือไม่?`)) {
+                              setContractDeleteLoadingId(contract.id);
+                              try {
+                                await onDeleteContract(contract.id);
+                              } catch {
+                                alert('ลบสัญญาไม่สำเร็จ');
+                              } finally {
+                                setContractDeleteLoadingId(null);
+                              }
+                            }
+                          }}
+                          disabled={contractDeleteLoadingId === contract.id}
+                          className={`px-2 py-1 font-bold rounded text-[9px] ${contractDeleteLoadingId === contract.id ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-rose-100 hover:bg-rose-200 text-rose-800'}`}
+                        >
+                          {contractDeleteLoadingId === contract.id ? 'ลบ...' : 'ลบ'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {contracts.length === 0 && (
+              <div className="text-center py-8 text-slate-500 text-xs">
+                ยังไม่มีสัญญาในระบบ
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -573,6 +573,40 @@ export default function App() {
     showToast(`ลบสมาชิกทีมออกเรียบร้อย`);
   };
 
+  // 11. Admin: Update Contract
+  const handleUpdateContract = async (contractId: string, updates: Partial<Contract>) => {
+    const response = await fetch(`/api/contracts/${contractId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'อัปเดตสัญญาไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`อัปเดตสัญญาเรียบร้อย`);
+  };
+
+  // 12. Admin: Delete Contract
+  const handleDeleteContract = async (contractId: string) => {
+    const response = await fetch(`/api/contracts/${contractId}`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'ลบสัญญาไม่สำเร็จ');
+    }
+
+    await loadServerState();
+    showToast(`ลบสัญญาออกเรียบร้อย`);
+  };
+
   if (bootLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#fff6db_0%,#f8fafc_35%,#eef2ff_100%)] text-slate-700">
@@ -715,6 +749,8 @@ export default function App() {
                   onDeleteTeamMember={handleDeleteTeamMember}
                   onAddTeam={handleAddTeam}
                   onUpdateTeam={handleUpdateTeam}
+                  onUpdateContract={handleUpdateContract}
+                  onDeleteContract={handleDeleteContract}
                 />
               )}
             </motion.div>
