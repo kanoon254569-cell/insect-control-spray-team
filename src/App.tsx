@@ -13,6 +13,7 @@ const AdminPortal = lazy(() => import('./components/AdminPortal'));
 
 // Seed & types
 import { PortalRole, PestProblem, Booking, Contract, TechnicianJob, Invoice, JobStatus, PestType, TeamMember, TeamMemberRole, Team } from './types';
+import { resolvePortalRole } from './auth';
 import { 
   INITIAL_PACKAGES 
 } from './data';
@@ -45,6 +46,7 @@ function normalizePath(pathname: string): AppPath {
 export default function App() {
   const [route, setRoute] = useState<AppPath>(() => normalizePath(window.location.pathname));
   const [session, setSession] = useState<AuthSession | null>(null);
+  const [sessionRole, setSessionRole] = useState<PortalRole | null>(null);
   const [bootLoading, setBootLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -81,8 +83,11 @@ export default function App() {
 
         const data = await response.json();
         if (active) {
+          const resolvedRole = resolvePortalRole(data.teamRole);
+          const effectiveRole = data.role === 'user' && data.teamRole ? resolvedRole : data.role;
+          setSessionRole(effectiveRole);
           setSession({
-            role: data.role,
+            role: effectiveRole,
             username: data.username,
             displayName: data.displayName,
             token: data.token,
@@ -200,8 +205,10 @@ export default function App() {
     setAuthError(null);
     try {
       const result = await loginViaApi(values.username, values.password);
+      const effectiveRole = result.role === 'user' && result.teamRole ? resolvePortalRole(result.teamRole) : result.role;
+      setSessionRole(effectiveRole);
       setSession({
-        role: result.role,
+        role: effectiveRole,
         username: result.username,
         displayName: result.displayName,
         token: result.token,
@@ -220,7 +227,7 @@ export default function App() {
         setPackages(INITIAL_PACKAGES);
         setTeamMembers([]);
       }
-      navigate(ROLE_TO_PATH[result.role], true);
+      navigate(ROLE_TO_PATH[effectiveRole], true);
       showToast(`ยินดีต้อนรับ ${result.displayName}`, 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ';
@@ -235,8 +242,10 @@ export default function App() {
     setAuthError(null);
     try {
       const result = await registerViaApi(values);
+      const effectiveRole = result.role === 'user' && result.teamRole ? resolvePortalRole(result.teamRole) : result.role;
+      setSessionRole(effectiveRole);
       setSession({
-        role: result.role,
+        role: effectiveRole,
         username: result.username,
         displayName: result.displayName,
         token: result.token,
@@ -255,7 +264,7 @@ export default function App() {
         setPackages(INITIAL_PACKAGES);
         setTeamMembers([]);
       }
-      navigate(ROLE_TO_PATH[result.role], true);
+      navigate(ROLE_TO_PATH[effectiveRole], true);
       showToast(`สมัครบัญชีและเข้าสู่ระบบสำเร็จ: ${result.displayName}`, 'success');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'สมัครบัญชีไม่สำเร็จ';
@@ -271,6 +280,7 @@ export default function App() {
       credentials: 'include'
     }).finally(() => {
       setSession(null);
+      setSessionRole(null);
       navigate('/login', true);
     });
   };

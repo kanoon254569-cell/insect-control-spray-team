@@ -13,6 +13,7 @@ import {
   INITIAL_INVOICES,
   INITIAL_PACKAGES
 } from './src/data';
+import { resolvePortalRole } from './src/auth';
 import type {
   Booking,
   Contract,
@@ -369,7 +370,7 @@ app.post('/api/login', async (req, res) => {
     }
     
     // Create session for team member and preserve their team role and team assignment
-    const role = teamMember.role === 'team_lead' ? 'user' : 'technician';
+    const role = resolvePortalRole(teamMember.role);
     const session = await createSession(role, normalizedUsername, teamMember.role, teamMember.teamId, teamMember.teamName);
     res.setHeader(
       'Set-Cookie',

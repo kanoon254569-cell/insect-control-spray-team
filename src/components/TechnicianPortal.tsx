@@ -45,8 +45,9 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
   }, [teamName]);
 
   // Filter jobs by team
-  const filteredJobs = jobs.filter(job => job.assignedTeam === selectedTeam);
-  const activeJob = jobs.find(job => job.id === selectedJobId);
+  const effectiveTeamName = teamName || selectedTeam;
+  const filteredJobs = jobs.filter(job => job.assignedTeam === effectiveTeamName);
+  const activeJob = filteredJobs.find(job => job.id === selectedJobId) || null;
 
   const toggleChemical = (chem: string) => {
     if (selectedChemicals.includes(chem)) {
@@ -161,7 +162,7 @@ export default function TechnicianPortal({ jobs, teamRole, teamName, onUpdateJob
             <span>เลือกทีมปฏิบัติงานช่าง</span>
           </label>
           <select
-            value={selectedTeam}
+            value={effectiveTeamName}
             onChange={(e) => {
               setSelectedTeam(e.target.value);
               setSelectedJobId(null);
