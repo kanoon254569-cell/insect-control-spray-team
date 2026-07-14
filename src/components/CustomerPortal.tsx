@@ -231,7 +231,7 @@ export default function CustomerPortal({
           address: '',
           bookingDate: ''
         });
-        setActiveTab('tracking');
+        setActiveTab('payments');
       }, 2000);
     } catch {
       alert('จองบริการไม่สำเร็จ');
