@@ -572,7 +572,7 @@ app.post('/api/bookings', async (req, res) => {
     address,
     bookingDate,
     price,
-    status: 'ชำระเงินแล้ว',
+    status: 'รอชำระเงิน',
     invoiceNo: `INV-2026-00${invoiceCount + 1}`
   };
 
@@ -586,7 +586,7 @@ app.post('/api/bookings', async (req, res) => {
     amount: price,
     vat: Math.round(price * 0.07),
     totalAmount: Math.round(price * 1.07),
-    status: 'ชำระเงินแล้ว',
+    status: 'ค้างชำระ',
     dueDate: bookingDate,
     createdAt: new Date().toISOString().split('T')[0]
   };
