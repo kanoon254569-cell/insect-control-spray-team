@@ -60,7 +60,16 @@ export default function CustomerPortal({
   invoices,
   onUploadPaymentReceipt
 }: CustomerPortalProps) {
-  const [activeTab, setActiveTab] = useState<'catalog' | 'report' | 'tracking' | 'contracts' | 'payments'>('catalog');
+  const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'report' | 'tracking' | 'contracts' | 'payments'>('catalog');
+  
+  const customerInfo = (() => {
+    if (problems.length > 0) return { name: problems[0].customerName, phone: problems[0].customerPhone, address: problems[0].address };
+    if (bookings.length > 0) return { name: bookings[0].customerName, phone: bookings[0].customerPhone, address: bookings[0].address };
+    if (contracts.length > 0) return { name: contracts[0].customerName, phone: contracts[0].customerPhone, address: contracts[0].address };
+    return { name: '', phone: '', address: '' };
+  })();
+  
+  const activeContracts = contracts.filter(c => c.status === 'เปิดใช้งาน');
   
   // State for Problem Report Form
   const [reportForm, setReportForm] = useState({
@@ -210,6 +219,17 @@ export default function CustomerPortal({
       alert('กรุณากรอกข้อมูลจองคิวให้ครบถ้วน');
       return;
     }
+    
+    const customerPhone = bookingForm.customerPhone;
+    const existingActive = activeContracts.find(
+      c => c.customerPhone === customerPhone && c.packageName === selectedPkg.name && c.status === 'เปิดใช้งาน'
+    );
+    
+    if (existingActive) {
+      alert(`คุณมีสัญญาที่ยังใช้งาน "เปิดใช้งาน" สำหรับบริการนี้แล้วหนูง (${existingActive.documentNo})। งานไม่สามารถชื่อสินหลายกันไม่ได้บ้างไขงานนี้`);
+      return;
+    }
+    
     try {
       setBookingLoading(true);
       await onAddBooking({
@@ -247,6 +267,19 @@ export default function CustomerPortal({
         <div className="bg-white p-4 rounded-2xl shadow-xs border border-slate-100">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 px-2">เมนูบริการสำหรับลูกค้า</h3>
           <nav className="flex flex-col space-y-1">
+            <button
+              id="tab-profile"
+              onClick={() => setActiveTab('profile')}
+              className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                activeTab === 'profile'
+                  ? 'bg-amber-50 text-amber-700 border-l-4 border-amber-600 pl-3'
+                  : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Shield className="w-4 h-4 text-amber-600" />
+              <span>โปรไฟล์ของคุณ</span>
+            </button>
+
             <button
               id="tab-catalog"
               onClick={() => setActiveTab('catalog')}
@@ -342,6 +375,110 @@ export default function CustomerPortal({
       {/* Main Content Area */}
       <div className="lg:col-span-9">
         <AnimatePresence mode="wait">
+          {/* TAB 0: CUSTOMER PROFILE */}
+          {activeTab === 'profile' && (
+            <motion.div
+              key="profile"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="space-y-6"
+            >
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">โปรไฟล์ของคุณ</h2>
+                <p className="text-xs text-slate-500 mt-1">ข้อมูลส่วนบุคคลและสัญญาบริการที่ใช้งาน</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
+                  <div className="flex items-center gap-2 text-slate-700 mb-4">
+                    <Shield className="w-5 h-5" />
+                    <h3 className="font-bold">ข้อมูลส่วนบุคคล</h3>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">ชื่อ-นามสกุล</label>
+                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.name || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">เบอร์โทรศัพท์</label>
+                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.phone || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">ที่อยู่</label>
+                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.address || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
+                  <div className="flex items-center gap-2 text-slate-700 mb-4">
+                    <Activity className="w-5 h-5" />
+                    <h3 className="font-bold">สถานะสัญญา</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <span className="text-sm font-medium text-emerald-800">สัญญาที่ใช้งาน</span>
+                      <span className="text-lg font-bold text-emerald-700">{activeContracts.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                      <span className="text-sm font-medium text-slate-700">สัญญาทั้งหมด</span>
+                      <span className="text-lg font-bold text-slate-700">{contracts.length}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {activeContracts.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
+                  <div className="flex items-center gap-2 text-slate-700 mb-4">
+                    <FileText className="w-5 h-5" />
+                    <h3 className="font-bold">สัญญาที่ใช้งานอยู่</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {activeContracts.map((contract) => (
+                      <div key={contract.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="font-semibold text-slate-800">{contract.packageName}</p>
+                            <p className="text-xs text-slate-500 mt-1">{contract.documentNo}</p>
+                          </div>
+                          <span className="text-xs font-bold px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full">เปิดใช้งาน</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 mt-3 text-xs">
+                          <div>
+                            <label className="text-slate-500">เริ่มต้น</label>
+                            <p className="font-medium text-slate-700">{contract.startDate}</p>
+                          </div>
+                          <div>
+                            <label className="text-slate-500">สิ้นสุด</label>
+                            <p className="font-medium text-slate-700">{contract.endDate}</p>
+                          </div>
+                          <div>
+                            <label className="text-slate-500">การเยี่ยม</label>
+                            <p className="font-medium text-slate-700">{contract.completedVisits}/{contract.totalVisits}</p>
+                          </div>
+                          <div>
+                            <label className="text-slate-500">เยี่ยมถัดไป</label>
+                            <p className="font-medium text-slate-700">{contract.nextVisitDate}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {activeContracts.length === 0 && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+                  <Info className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-blue-800">คุณยังไม่มีสัญญาที่ใช้งาน</p>
+                  <p className="text-xs text-blue-600 mt-1">ไปเลือกซื้อแพ็กเกจบริการเพื่อสร้างสัญญาใหม่</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* TAB 1: SERVICE CATALOG */}
           {activeTab === 'catalog' && (
             <motion.div
