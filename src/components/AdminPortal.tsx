@@ -13,7 +13,8 @@ import {
   Wrench, 
   Briefcase, 
   Clock,
-  Droplet
+  Droplet,
+  Download
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -27,6 +28,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import * as XLSX from 'xlsx';
 import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, Invoice, TeamMember, TeamMemberRole, Team } from '../types';
 
 type NewTeamMemberPayload = Omit<TeamMember, 'id' | 'createdAt'> & { password: string };
@@ -144,6 +146,33 @@ export default function AdminPortal({
   const [contractUpdateLoading, setContractUpdateLoading] = useState(false);
   const [contractDeleteLoadingId, setContractDeleteLoadingId] = useState<string | null>(null);
   const [contractSuccess, setContractSuccess] = useState(false);
+
+  // Excel export function
+  const exportJobsToExcel = () => {
+    const data = jobs.map((job) => ({
+      'รหัสงาน': job.id,
+      'ทีมช่าง': job.assignedTeam,
+      'ชื่องาน': job.title,
+      'คำอธิบาย': job.description,
+      'ชื่อลูกค้า': job.customerName,
+      'เบอร์โทร': job.customerPhone,
+      'ที่อยู่': job.address,
+      'วันนัด': job.appointmentDate,
+      'สถานะ': job.status,
+      'หมายเหตุ': job.notesByTech || '-',
+      'ปืนเคมี': job.chemicalsUsed?.join(', ') || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ประวัติงาน');
+
+    // Auto-adjust column width
+    const colWidths = [12, 12, 20, 30, 15, 15, 30, 12, 12, 20, 20];
+    ws['!cols'] = colWidths.map(width => ({ wch: width }));
+
+    XLSX.writeFile(wb, `ประวัติงาน-${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
 
   // Selected Invoice for printing/detail modal
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
@@ -873,7 +902,16 @@ export default function AdminPortal({
         <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
           <div className="flex justify-between items-center pb-2 border-b border-slate-100">
             <h3 className="text-sm font-extrabold text-slate-800">ประวัติการเข้าปฏิบัติงานของทีมช่างทั้งหมด</h3>
-            <span className="text-xs text-slate-400">สรุปรายงานการใช้เคมีป้องกันกำจัดแมลงและปลวกย้อนหลัง</span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400">สรุปรายงานการใช้เคมีป้องกันกำจัดแมลงและปลวกย้อนหลัง</span>
+              <button
+                onClick={exportJobsToExcel}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-bold text-xs transition whitespace-nowrap"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Excel</span>
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto border border-slate-100 rounded-xl">
