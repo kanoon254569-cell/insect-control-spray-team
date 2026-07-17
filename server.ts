@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { MongoClient, Db, Collection } from 'mongodb';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createWorker } from 'tesseract.js';
@@ -65,6 +65,19 @@ const DEFAULT_ACCOUNTS: Array<{ username: string; password: string; role: Portal
   { username: 'technician', password: '1234', role: 'technician', displayName: 'Technician' },
   { username: 'customer', password: '1234', role: 'customer', displayName: 'Customer' }
 ];
+
+// Optional single-user config override. If `data/user.json` exists it can contain:
+// { "username": "admin", "password": "pass123", "displayName": "Admin", "role": "user", "enforce": true }
+const SINGLE_USER_CONFIG_PATH = path.join(__dirname, 'data', 'user.json');
+let SINGLE_USER_CONFIG: any = null;
+if (existsSync(SINGLE_USER_CONFIG_PATH)) {
+  try {
+    const raw = readFileSync(SINGLE_USER_CONFIG_PATH, 'utf8');
+    SINGLE_USER_CONFIG = JSON.parse(raw);
+  } catch (err) {
+    console.warn('Failed to parse data/user.json, ignoring single-user config', err);
+  }
+}
 
 type SessionRow = {
   sessionId: string;
@@ -277,6 +290,18 @@ async function createUser(username: string, password: string, role: PortalRole, 
 }
 
 async function seedDefaultUsers() {
+  // If a single-user config is present, seed only that one account and do not create defaults.
+  if (SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.username && SINGLE_USER_CONFIG.password) {
+    const username = normalizeUsername(SINGLE_USER_CONFIG.username);
+    const role: PortalRole = isPortalRole(SINGLE_USER_CONFIG.role) ? (SINGLE_USER_CONFIG.role as PortalRole) : 'user';
+    const displayName = normalizeDisplayName(SINGLE_USER_CONFIG.displayName, username);
+    const existing = await users.findOne({ username, role });
+    if (!existing) {
+      await createUser(username, SINGLE_USER_CONFIG.password, role, displayName);
+    }
+    return;
+  }
+
   for (const account of DEFAULT_ACCOUNTS) {
     const existing = await users.findOne({ username: account.username, role: account.role });
     if (existing) continue;
@@ -459,6 +484,10 @@ app.post('/api/register', async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
   }
+  // If a single-user config is present and enforces a single account, disable registration.
+  if (SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce) {
+    return res.status(403).json({ message: 'การสมัครบัญชีถูกปิดสำหรับระบบนี้' });
+  }
 
   const existing = await users.findOne({ username: normalizedUsername, role });
   if (existing) {
@@ -483,6 +512,11 @@ app.post('/api/register', async (req, res) => {
     username: session.username,
     displayName: session.displayName
   });
+});
+
+// Expose minimal config to the frontend so UI can hide registration when disabled
+app.get('/api/config', async (_req, res) => {
+  return res.json({ registrationDisabled: Boolean(SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce) });
 });
 
 app.post('/api/logout', async (req, res) => {

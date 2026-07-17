@@ -21,6 +21,22 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin, onRegister, loading, error }: LoginPageProps) {
+  const [registerAllowed, setRegisterAllowed] = useState(true);
+
+  React.useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active && typeof data.registrationDisabled === 'boolean') {
+          setRegisterAllowed(!data.registrationDisabled);
+        }
+      } catch {}
+    })();
+    return () => { active = false; };
+  }, []);
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [values, setValues] = useState<LoginValues>({
     username: '',
@@ -81,14 +97,20 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
             </button>
             <button
               type="button"
-              onClick={() => !loading && setMode('register')}
+              onClick={() => !loading && registerAllowed && setMode('register')}
               className={`rounded-xl px-3 py-2 text-xs font-extrabold transition ${
                 mode === 'register' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-              }`}
+              } ${!registerAllowed ? 'opacity-40 cursor-not-allowed' : ''}`}
+              disabled={!registerAllowed}
             >
               สมัครบัญชี
             </button>
           </div>
+          {!registerAllowed && (
+            <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              ระบบถูกตั้งค่าให้มีบัญชีเดียวเท่านั้น การสมัครใหม่ถูกปิดไว้
+            </div>
+          )}
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             {mode === 'register' && (
