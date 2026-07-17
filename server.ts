@@ -547,6 +547,7 @@ app.get('/api/state', async (req, res) => {
 
   const state = await getState();
 
+  // Team members see only their team's jobs
   if (session.teamRole === 'team_member' || session.teamRole === 'team_lead') {
     const filteredJobs = state.jobs.filter((job) => job.assignedTeam === session.teamName);
     return res.json({
@@ -559,11 +560,22 @@ app.get('/api/state', async (req, res) => {
     });
   }
 
+  // Customers should only see their own records
+  if (session.role === 'customer') {
+    const username = session.username;
+    const problems = state.problems.filter((p: any) => p.createdBy === username || p.customerName === session.displayName);
+    const bookings = state.bookings.filter((b: any) => b.createdBy === username || b.customerName === session.displayName);
+    const contracts = state.contracts.filter((c: any) => c.createdBy === username || c.customerName === session.displayName);
+    const invoices = state.invoices.filter((i: any) => i.createdBy === username || i.customerName === session.displayName);
+    return res.json({ problems, bookings, contracts, jobs: [], invoices, packages: state.packages });
+  }
+
   return res.json(state);
 });
 
 app.post('/api/problems', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
   const { customerName, customerPhone, address, pestType, description, urgency } = req.body ?? {};
 
   if (!customerName || !customerPhone || !address || !pestType || !description || !urgency) {
@@ -579,6 +591,7 @@ app.post('/api/problems', async (req, res) => {
     description,
     urgency,
     createdAt: new Date().toISOString(),
+    createdBy: session.username,
     status: 'รอดำเนินการ'
   };
 
@@ -588,7 +601,8 @@ app.post('/api/problems', async (req, res) => {
 });
 
 app.post('/api/bookings', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
   const { packageId, packageName, customerName, customerPhone, address, bookingDate, price } = req.body ?? {};
 
   if (!packageId || !packageName || !customerName || !customerPhone || !address || !bookingDate || typeof price !== 'number') {
@@ -608,6 +622,8 @@ app.post('/api/bookings', async (req, res) => {
     price,
     status: 'รอชำระเงิน',
     invoiceNo: `INV-2026-00${invoiceCount + 1}`
+    ,
+    createdBy: session.username
   };
 
   const invoice: Invoice = {
@@ -623,6 +639,8 @@ app.post('/api/bookings', async (req, res) => {
     status: 'ค้างชำระ',
     dueDate: bookingDate,
     createdAt: new Date().toISOString().split('T')[0]
+    ,
+    createdBy: session.username
   };
 
   await bookingsCollection.insertOne(booking);
@@ -788,7 +806,8 @@ app.post('/api/jobs/:jobId/approve', async (req, res) => {
 });
 
 app.post('/api/invoices', async (req, res) => {
-  if (!(await requireSession(req, res))) return;
+  const session = await requireSession(req, res);
+  if (!session) return;
   const { customerName, customerPhone, address, description, amount, vat, totalAmount, status, dueDate } = req.body ?? {};
   if (
     !customerName ||
@@ -818,6 +837,8 @@ app.post('/api/invoices', async (req, res) => {
     status,
     dueDate,
     createdAt: new Date().toISOString().split('T')[0]
+    ,
+    createdBy: session.username
   };
 
   await invoicesCollection.insertOne(invoice);

@@ -34,6 +34,7 @@ export interface PestProblem {
   description: string;
   urgency: 'ต่ำ' | 'ปานกลาง' | 'สูง' | 'เร่งด่วนที่สุด';
   createdAt: string;
+  createdBy?: string;
   status: 'รอดำเนินการ' | 'จัดสรรคิวช่างแล้ว' | 'กำลังดำเนินการ' | 'เสร็จสิ้น';
   assignedTeam?: string;
   appointmentDate?: string;
@@ -60,6 +61,7 @@ export interface Booking {
   price: number;
   status: 'รอยืนยัน' | 'ชำระเงินแล้ว' | 'กำลังจัดทีมงาน' | 'เสร็จสิ้น';
   invoiceNo?: string;
+  createdBy?: string;
 }
 
 export interface Contract {
@@ -76,6 +78,7 @@ export interface Contract {
   price: number;
   status: 'เปิดใช้งาน' | 'เสร็จสิ้นแล้ว' | 'ระงับชั่วคราว';
   documentNo: string;
+  createdBy?: string;
 }
 
 export interface TechnicianJob {
@@ -94,6 +97,7 @@ export interface TechnicianJob {
   imageReport?: string; // photo data url or local photo state
   chemicalsUsed?: string[];
   completedAt?: string;
+  createdBy?: string;
 }
 
 export interface Invoice {
@@ -114,6 +118,7 @@ export interface Invoice {
   transferTime?: string;
   paymentVerifiedAt?: string;
   paymentReference?: string;
+  createdBy?: string;
 }
 
 export type PortalRole = 'customer' | 'technician' | 'user';
