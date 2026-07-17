@@ -23,6 +23,8 @@ type AuthSession = {
   username: string;
   displayName: string;
   token: string;
+  phone?: string;
+  address?: string;
   teamRole?: TeamMemberRole;
   teamId?: string;
   teamName?: string;

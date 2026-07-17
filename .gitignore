@@ -8,3 +8,5 @@ coverage/
 data/
 .env*
 !.env.example
+data/user.json
+.env.local

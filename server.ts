@@ -84,6 +84,8 @@ type SessionRow = {
   role: PortalRole;
   username: string;
   displayName: string;
+  phone?: string;
+  address?: string;
   expiresAt: number;
   teamRole?: TeamMemberRole;
   teamId?: string;
@@ -96,6 +98,8 @@ type UserRow = {
   passwordHash: string;
   role: PortalRole;
   displayName: string;
+  phone?: string;
+  address?: string;
   createdAt: string;
 };
 
@@ -261,6 +265,8 @@ async function createSession(role: PortalRole, username: string, teamRole?: Team
     role,
     username,
     displayName: user?.displayName ?? username,
+    phone: user?.phone,
+    address: user?.address,
     expiresAt: Date.now() + SESSION_TTL_MS,
     teamRole,
     teamId,
@@ -275,13 +281,15 @@ async function clearSession(sessionId: string | null) {
   await sessions.deleteOne({ sessionId });
 }
 
-async function createUser(username: string, password: string, role: PortalRole, displayName: string) {
+async function createUser(username: string, password: string, role: PortalRole, displayName: string, phone?: string, address?: string) {
   const user: UserRow = {
     id: randomUUID(),
     username,
     passwordHash: hashPassword(password),
     role,
     displayName,
+    phone,
+    address,
     createdAt: new Date().toISOString()
   };
 
@@ -291,13 +299,20 @@ async function createUser(username: string, password: string, role: PortalRole, 
 
 async function seedDefaultUsers() {
   // If a single-user config is present, seed only that one account and do not create defaults.
-  if (SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.username && SINGLE_USER_CONFIG.password) {
+  if (SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.username) {
     const username = normalizeUsername(SINGLE_USER_CONFIG.username);
     const role: PortalRole = isPortalRole(SINGLE_USER_CONFIG.role) ? (SINGLE_USER_CONFIG.role as PortalRole) : 'user';
     const displayName = normalizeDisplayName(SINGLE_USER_CONFIG.displayName, username);
+    const pwFromEnv = process.env.SEED_PASSWORD;
+    const configuredPw = typeof SINGLE_USER_CONFIG.password === 'string' && SINGLE_USER_CONFIG.password.length > 0 ? SINGLE_USER_CONFIG.password : null;
+    const seedPassword = pwFromEnv || configuredPw;
     const existing = await users.findOne({ username, role });
+    if (!seedPassword) {
+      console.warn('Single-user config present but no seed password provided. Set SEED_PASSWORD env var to seed the user. Skipping seeding.');
+      return;
+    }
     if (!existing) {
-      await createUser(username, SINGLE_USER_CONFIG.password, role, displayName);
+      await createUser(username, seedPassword, role, displayName);
     }
     return;
   }
@@ -397,6 +412,8 @@ app.get('/api/me', async (req, res) => {
     role: session.role,
     username: session.username,
     displayName: session.displayName,
+    phone: session.phone,
+    address: session.address,
     teamRole: session.teamRole,
     teamId: session.teamId,
     teamName: session.teamName
@@ -491,7 +508,7 @@ app.post('/api/register', async (req, res) => {
 
   const existing = await users.findOne({ username: normalizedUsername, role });
   if (existing) {
-    return res.status(409).json({ message: 'มีบัญชีนี้ในระบบแล้ว' });
+    return res.status(409).json({ message: 'มีบัญชีนี้ในระบบแล้ว กรุณาเข้าสู่ระบบ' });
   }
 
   const user = await createUser(normalizedUsername, password, role, normalizeDisplayName(displayName, normalizedUsername));
@@ -517,6 +534,63 @@ app.post('/api/register', async (req, res) => {
 // Expose minimal config to the frontend so UI can hide registration when disabled
 app.get('/api/config', async (_req, res) => {
   return res.json({ registrationDisabled: Boolean(SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce) });
+});
+
+app.get('/api/profile', async (req, res) => {
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  const user = await users.findOne({ username: session.username, role: session.role }, { projection: { _id: 0 } });
+  if (!user) {
+    return res.status(404).json({ message: 'ไม่พบข้อมูลผู้ใช้' });
+  }
+
+  return res.json({
+    username: user.username,
+    displayName: user.displayName,
+    phone: user.phone,
+    address: user.address
+  });
+});
+
+app.patch('/api/profile', async (req, res) => {
+  const session = await requireSession(req, res);
+  if (!session) return;
+
+  const { displayName, phone, address } = req.body ?? {};
+  if (typeof displayName !== 'string' || displayName.trim().length === 0) {
+    return res.status(400).json({ message: 'กรุณากรอกชื่อที่จะแสดง' });
+  }
+
+  const normalizedDisplayName = displayName.trim();
+  await users.updateOne(
+    { username: session.username, role: session.role },
+    {
+      $set: {
+        displayName: normalizedDisplayName,
+        phone: typeof phone === 'string' ? phone.trim() : session.phone,
+        address: typeof address === 'string' ? address.trim() : session.address
+      }
+    }
+  );
+
+  await sessions.updateMany(
+    { username: session.username, role: session.role },
+    {
+      $set: {
+        displayName: normalizedDisplayName,
+        phone: typeof phone === 'string' ? phone.trim() : session.phone,
+        address: typeof address === 'string' ? address.trim() : session.address
+      }
+    }
+  );
+
+  return res.json({
+    username: session.username,
+    displayName: normalizedDisplayName,
+    phone: typeof phone === 'string' ? phone.trim() : session.phone,
+    address: typeof address === 'string' ? address.trim() : session.address
+  });
 });
 
 app.post('/api/logout', async (req, res) => {

@@ -59,7 +59,7 @@ export interface Booking {
   address: string;
   bookingDate: string;
   price: number;
-  status: 'รอยืนยัน' | 'ชำระเงินแล้ว' | 'กำลังจัดทีมงาน' | 'เสร็จสิ้น';
+  status: 'รอชำระเงิน' | 'รอยืนยัน' | 'ชำระเงินแล้ว' | 'กำลังจัดทีมงาน' | 'เสร็จสิ้น';
   invoiceNo?: string;
   createdBy?: string;
 }

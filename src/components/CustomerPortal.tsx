@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
   Calendar, 
@@ -62,7 +62,17 @@ export default function CustomerPortal({
 }: CustomerPortalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'report' | 'tracking' | 'contracts' | 'payments'>('catalog');
   
+  // State for Problem Report Form
+  const [profile, setProfile] = useState({
+    displayName: '',
+    phone: '',
+    address: ''
+  });
+
   const customerInfo = (() => {
+    if (profile.displayName || profile.phone || profile.address) {
+      return { name: profile.displayName, phone: profile.phone, address: profile.address };
+    }
     if (problems.length > 0) return { name: problems[0].customerName, phone: problems[0].customerPhone, address: problems[0].address };
     if (bookings.length > 0) return { name: bookings[0].customerName, phone: bookings[0].customerPhone, address: bookings[0].address };
     if (contracts.length > 0) return { name: contracts[0].customerName, phone: contracts[0].customerPhone, address: contracts[0].address };
@@ -72,6 +82,9 @@ export default function CustomerPortal({
   const activeContracts = contracts.filter(c => c.status === 'เปิดใช้งาน');
   
   // State for Problem Report Form
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+
   const [reportForm, setReportForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -103,6 +116,67 @@ export default function CustomerPortal({
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [ocrStatus, setOcrStatus] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/profile', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (active) {
+          setProfile({
+            displayName: data.displayName || '',
+            phone: data.phone || '',
+            address: data.address || ''
+          });
+          setReportForm((prev) => ({
+            ...prev,
+            customerName: data.displayName || prev.customerName,
+            customerPhone: data.phone || prev.customerPhone,
+            address: data.address || prev.address
+          }));
+          setBookingForm((prev) => ({
+            ...prev,
+            customerName: data.displayName || prev.customerName,
+            customerPhone: data.phone || prev.customerPhone,
+            address: data.address || prev.address
+          }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const handleProfileSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (profileLoading) return;
+    if (!profile.displayName.trim()) {
+      alert('กรุณากรอกชื่อที่จะแสดง');
+      return;
+    }
+    try {
+      setProfileLoading(true);
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(profile)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'ไม่สามารถบันทึกโปรไฟล์ได้');
+      }
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 3000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'ไม่สามารถบันทึกโปรไฟล์ได้');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const handleReportSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -389,26 +463,56 @@ export default function CustomerPortal({
                 <p className="text-xs text-slate-500 mt-1">ข้อมูลส่วนบุคคลและสัญญาบริการที่ใช้งาน</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">
                   <div className="flex items-center gap-2 text-slate-700 mb-4">
                     <Shield className="w-5 h-5" />
                     <h3 className="font-bold">ข้อมูลส่วนบุคคล</h3>
                   </div>
-                  <div className="space-y-4">
+                  <form onSubmit={handleProfileSave} className="space-y-4">
                     <div>
-                      <label className="text-xs font-semibold text-slate-500 uppercase">ชื่อ-นามสกุล</label>
-                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.name || '—'}</p>
+                      <label className="text-xs font-semibold text-slate-500 uppercase">ชื่อที่แสดง</label>
+                      <input
+                        type="text"
+                        value={profile.displayName}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, displayName: e.target.value }))}
+                        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
+                        placeholder="ชื่อที่แสดงในระบบ"
+                      />
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">เบอร์โทรศัพท์</label>
-                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.phone || '—'}</p>
+                      <input
+                        type="tel"
+                        value={profile.phone}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, phone: e.target.value }))}
+                        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
+                        placeholder="0812345678"
+                      />
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-slate-500 uppercase">ที่อยู่</label>
-                      <p className="text-sm font-medium text-slate-800 mt-1">{customerInfo.address || '—'}</p>
+                      <textarea
+                        value={profile.address}
+                        onChange={(e) => setProfile((prev) => ({ ...prev, address: e.target.value }))}
+                        className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
+                        placeholder="บ้านเลขที่ ซอย ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด"
+                        rows={3}
+                      />
                     </div>
-                  </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={profileLoading}
+                        className="inline-flex items-center justify-center rounded-2xl bg-amber-600 px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-amber-900/20 transition hover:-translate-y-0.5 hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {profileLoading ? 'กำลังบันทึก...' : 'บันทึกโปรไฟล์'}
+                      </button>
+                      {profileSaved && (
+                        <span className="text-sm font-medium text-emerald-700">บันทึกเรียบร้อยแล้ว</span>
+                      )}
+                    </div>
+                  </form>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6">

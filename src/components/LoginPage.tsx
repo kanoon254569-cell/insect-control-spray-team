@@ -114,18 +114,21 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
             {mode === 'register' && (
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Display Name
-                </span>
-                <input
-                  value={values.displayName}
-                  onChange={(e) => setValues((prev) => ({ ...prev, displayName: e.target.value }))}
-                  disabled={loading}
-                  className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
-                  placeholder="ชื่อที่จะแสดงในระบบ"
-                />
-              </label>
+              <>
+                <label className="block">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Display Name
+                  </span>
+                  <input
+                    value={values.displayName}
+                    onChange={(e) => setValues((prev) => ({ ...prev, displayName: e.target.value }))}
+                    disabled={loading}
+                    className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-amber-400"
+                    placeholder="ชื่อที่จะแสดงในระบบ"
+                  />
+                </label>
+                <p className="text-xs text-slate-500">Display Name นี้จะแสดงแทนชื่อผู้ใช้ในระบบ และจะใช้เป็นข้อมูลโปรไฟล์ของคุณ</p>
+              </>
             )}
 
             <label className="block">
