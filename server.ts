@@ -42,7 +42,17 @@ const host = '0.0.0.0';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SESSION_COOKIE = 'bugguard_session';
+const LINE_LOGIN_STATE_COOKIE = 'bugguard_line_state';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
+const LINE_LOGIN_CHANNEL_ID = process.env.LINE_LOGIN_CHANNEL_ID || process.env.LINE_CHANNEL_ID;
+const LINE_LOGIN_CHANNEL_SECRET = process.env.LINE_LOGIN_CHANNEL_SECRET || process.env.LINE_CHANNEL_SECRET;
+const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN;
+const LINE_TARGET_USER_ID = process.env.LINE_TARGET_USER_ID;
+const SERVER_ROLE_TO_PATH: Record<PortalRole, string> = {
+  user: '/user',
+  technician: '/technician',
+  customer: '/customer'
+};
 
 if (!process.env.DATABASE_URL && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
   throw new Error(
@@ -101,6 +111,13 @@ type UserRow = {
   phone?: string;
   address?: string;
   createdAt: string;
+};
+
+type LineIdTokenProfile = {
+  sub: string;
+  name?: string;
+  picture?: string;
+  email?: string;
 };
 
 type JobDocument = TechnicianJob & { createdAt: string };
@@ -241,6 +258,159 @@ function verifyPassword(password: string, storedHash: string) {
   const storedBuffer = Buffer.from(hash, 'hex');
   const candidateBuffer = scryptSync(password, salt, storedBuffer.length);
   return storedBuffer.length === candidateBuffer.length && timingSafeEqual(storedBuffer, candidateBuffer);
+}
+
+function getAppUrl(req: express.Request) {
+  const configuredUrl = process.env.APP_URL?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+  const proto = req.get('x-forwarded-proto') || req.protocol;
+  const hostHeader = req.get('x-forwarded-host') || req.get('host');
+  return `${proto}://${hostHeader}`;
+}
+
+function setSessionCookie(res: express.Response, sessionId: string) {
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(SESSION_COOKIE, sessionId, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: SESSION_TTL_MS
+    })
+  );
+}
+
+function setLineStateCookie(res: express.Response, state: string) {
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(LINE_LOGIN_STATE_COOKIE, state, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 1000 * 60 * 10
+    })
+  );
+}
+
+function clearLineStateCookie(res: express.Response) {
+  res.append(
+    'Set-Cookie',
+    serializeCookie(LINE_LOGIN_STATE_COOKIE, '', {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/',
+      maxAge: 0
+    })
+  );
+}
+
+function getLineRedirectUri(req: express.Request) {
+  return `${getAppUrl(req)}/api/auth/line/callback`;
+}
+
+async function verifyLineIdToken(idToken: string): Promise<LineIdTokenProfile> {
+  if (!LINE_LOGIN_CHANNEL_ID) {
+    throw new Error('LINE Login channel ID is not configured');
+  }
+
+  const params = new URLSearchParams({
+    id_token: idToken,
+    client_id: LINE_LOGIN_CHANNEL_ID
+  });
+
+  const response = await fetch('https://api.line.me/oauth2/v2.1/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params
+  });
+
+  if (!response.ok) {
+    throw new Error(`LINE ID token verification failed with ${response.status}`);
+  }
+
+  const profile = await response.json();
+  if (!profile?.sub) {
+    throw new Error('LINE ID token did not include a user ID');
+  }
+  return profile;
+}
+
+async function exchangeLineCodeForProfile(req: express.Request, code: string) {
+  if (!LINE_LOGIN_CHANNEL_ID || !LINE_LOGIN_CHANNEL_SECRET) {
+    throw new Error('LINE Login is not configured');
+  }
+
+  const params = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: getLineRedirectUri(req),
+    client_id: LINE_LOGIN_CHANNEL_ID,
+    client_secret: LINE_LOGIN_CHANNEL_SECRET
+  });
+
+  const response = await fetch('https://api.line.me/oauth2/v2.1/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params
+  });
+
+  if (!response.ok) {
+    throw new Error(`LINE token exchange failed with ${response.status}`);
+  }
+
+  const tokenResult = await response.json();
+  if (!tokenResult?.id_token) {
+    throw new Error('LINE token response did not include an ID token');
+  }
+
+  return verifyLineIdToken(tokenResult.id_token);
+}
+
+async function createLineSession(profile: LineIdTokenProfile) {
+  const username = `line:${profile.sub.toLowerCase()}`;
+  const role: PortalRole = 'customer';
+  const existing = await users.findOne({ username, role }, { projection: { _id: 0 } });
+
+  if (!existing) {
+    await createUser(username, randomBytes(32).toString('hex'), role, normalizeDisplayName(profile.name, 'LINE User'));
+  } else if (profile.name && profile.name !== existing.displayName) {
+    await users.updateOne({ username, role }, { $set: { displayName: profile.name } });
+  }
+
+  return createSession(role, username);
+}
+
+function getLineRecipientForUsername(username?: string) {
+  if (username?.startsWith('line:')) return username.slice('line:'.length);
+  return LINE_TARGET_USER_ID;
+}
+
+async function pushLineMessage(to: string | undefined, text: string) {
+  if (!LINE_CHANNEL_ACCESS_TOKEN || !to) return;
+
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/message/push', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LINE_CHANNEL_ACCESS_TOKEN}`
+      },
+      body: JSON.stringify({
+        to,
+        messages: [{ type: 'text', text }]
+      })
+    });
+
+    if (!response.ok) {
+      console.warn('LINE push message failed', response.status, await response.text().catch(() => ''));
+    }
+  } catch (error) {
+    console.warn('LINE push message failed', error);
+  }
+}
+
+async function notifyCustomer(username: string | undefined, text: string) {
+  await pushLineMessage(getLineRecipientForUsername(username), text);
 }
 
 function makeId(prefix: string, base: number, index: number) {
@@ -467,6 +637,53 @@ app.get('/api/me', async (req, res) => {
   });
 });
 
+app.get('/api/auth/line/start', (req, res) => {
+  if (!LINE_LOGIN_CHANNEL_ID || !LINE_LOGIN_CHANNEL_SECRET) {
+    return res.status(503).json({ message: 'ยังไม่ได้ตั้งค่า LINE Login' });
+  }
+
+  const state = randomBytes(24).toString('hex');
+  const nonce = randomBytes(24).toString('hex');
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: LINE_LOGIN_CHANNEL_ID,
+    redirect_uri: getLineRedirectUri(req),
+    state,
+    scope: 'profile openid',
+    nonce
+  });
+
+  setLineStateCookie(res, state);
+  return res.redirect(`https://access.line.me/oauth2/v2.1/authorize?${params.toString()}`);
+});
+
+app.get('/api/auth/line/callback', async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+  const cookies = parseCookies(req.headers.cookie || '');
+
+  if (error) {
+    clearLineStateCookie(res);
+    return res.redirect(`/login?line_error=${encodeURIComponent(String(error_description || error))}`);
+  }
+
+  if (!code || !state || cookies[LINE_LOGIN_STATE_COOKIE] !== String(state)) {
+    clearLineStateCookie(res);
+    return res.redirect('/login?line_error=invalid_state');
+  }
+
+  try {
+    const profile = await exchangeLineCodeForProfile(req, String(code));
+    const session = await createLineSession(profile);
+    setSessionCookie(res, session.sessionId);
+    clearLineStateCookie(res);
+    return res.redirect(SERVER_ROLE_TO_PATH[session.role]);
+  } catch (err) {
+    console.error('LINE Login failed', err);
+    clearLineStateCookie(res);
+    return res.redirect('/login?line_error=line_login_failed');
+  }
+});
+
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body ?? {};
   if (!username || !password) {
@@ -498,15 +715,7 @@ app.post('/api/login', async (req, res) => {
       ].join('\n')
     );
 
-    res.setHeader(
-      'Set-Cookie',
-      serializeCookie(SESSION_COOKIE, session.sessionId, {
-        httpOnly: true,
-        sameSite: 'Lax',
-        path: '/',
-        maxAge: SESSION_TTL_MS
-      })
-    );
+    setSessionCookie(res, session.sessionId);
     
     return res.json({
       token: session.sessionId,
@@ -540,15 +749,7 @@ app.post('/api/login', async (req, res) => {
     ].join('\n')
   );
 
-  res.setHeader(
-    'Set-Cookie',
-    serializeCookie(SESSION_COOKIE, session.sessionId, {
-      httpOnly: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: SESSION_TTL_MS
-    })
-  );
+  setSessionCookie(res, session.sessionId);
 
   return res.json({
     token: session.sessionId,
@@ -599,15 +800,7 @@ app.post('/api/register', async (req, res) => {
     ].join('\n')
   );
 
-  res.setHeader(
-    'Set-Cookie',
-    serializeCookie(SESSION_COOKIE, session.sessionId, {
-      httpOnly: true,
-      sameSite: 'Lax',
-      path: '/',
-      maxAge: SESSION_TTL_MS
-    })
-  );
+  setSessionCookie(res, session.sessionId);
 
   return res.status(201).json({
     token: session.sessionId,
@@ -619,7 +812,10 @@ app.post('/api/register', async (req, res) => {
 
 // Expose minimal config to the frontend so UI can hide registration when disabled
 app.get('/api/config', async (_req, res) => {
-  return res.json({ registrationDisabled: Boolean(SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce) });
+  return res.json({
+    registrationDisabled: Boolean(SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce),
+    lineLoginEnabled: Boolean(LINE_LOGIN_CHANNEL_ID && LINE_LOGIN_CHANNEL_SECRET)
+  });
 });
 
 app.get('/api/profile', async (req, res) => {
@@ -756,6 +952,10 @@ app.post('/api/problems', async (req, res) => {
   };
 
   await problemsCollection.insertOne(entry);
+  await notifyCustomer(
+    entry.createdBy,
+    `รับแจ้งปัญหาเรียบร้อย\nเลขที่: ${entry.id}\nประเภท: ${entry.pestType}\nสถานะ: ${entry.status}`
+  );
 
   void sendLineNotification(
     [
@@ -819,6 +1019,10 @@ app.post('/api/bookings', async (req, res) => {
 
   await bookingsCollection.insertOne(booking);
   await invoicesCollection.insertOne(invoice);
+  await notifyCustomer(
+    booking.createdBy,
+    `จองบริการเรียบร้อย\nเลขจอง: ${booking.id}\nแพ็กเกจ: ${booking.packageName}\nใบแจ้งหนี้: ${invoice.invoiceNo}\nยอดรวม: ${invoice.totalAmount.toLocaleString('th-TH')} บาท`
+  );
 
   void sendLineNotification(
     [
@@ -883,6 +1087,10 @@ app.post('/api/invoices/:invoiceId/receipt', async (req, res) => {
       }
     }
   );
+  await notifyCustomer(
+    invoice.createdBy,
+    `ยืนยันการชำระเงินแล้ว\nใบแจ้งหนี้: ${invoice.invoiceNo}\nยอดรวม: ${invoice.totalAmount.toLocaleString('th-TH')} บาท`
+  );
 
   void sendLineNotification(
     [
@@ -926,6 +1134,7 @@ app.post('/api/jobs/assign', async (req, res) => {
     assignedTeam: teamName,
     status: 'กำลังเตรียมตัว',
     chemicalsUsed: [],
+    createdBy: source.createdBy,
     createdAt: new Date().toISOString()
   };
 
@@ -939,6 +1148,10 @@ app.post('/api/jobs/assign', async (req, res) => {
   } else {
     await bookingsCollection.updateOne({ id: sourceId }, { $set: { status: 'กำลังจัดทีมงาน' } });
   }
+  await notifyCustomer(
+    source.createdBy,
+    `จัดคิวทีมงานแล้ว\nงาน: ${job.id}\nทีม: ${teamName}\nวันนัดหมาย: ${date}\nสถานะ: ${job.status}`
+  );
 
   void sendLineNotification(
     [
@@ -978,6 +1191,10 @@ app.patch('/api/jobs/:jobId/status', async (req, res) => {
   }
 
   await syncJobSourceStatus(job, status as JobStatus, updates);
+  await notifyCustomer(
+    job.createdBy,
+    `อัปเดตสถานะงาน\nงาน: ${job.id}\nสถานะล่าสุด: ${status}`
+  );
 
   if (status === 'ส่งงานแล้ว') {
     void sendLineNotification(
@@ -1055,6 +1272,10 @@ app.post('/api/jobs/:jobId/approve', async (req, res) => {
     await bookingsCollection.updateOne({ id: job.sourceId }, { $set: { status: 'เสร็จสิ้น' } });
   }
   await contractsCollection.insertOne(contract);
+  await notifyCustomer(
+    job.createdBy,
+    `ตรวจรับงานเรียบร้อย\nงาน: ${job.id}\nสัญญา: ${contract.documentNo}\nสถานะ: เปิดใช้งาน`
+  );
 
   return res.json({ ok: true, contract });
 });
@@ -1096,6 +1317,10 @@ app.post('/api/invoices', async (req, res) => {
   };
 
   await invoicesCollection.insertOne(invoice);
+  await notifyCustomer(
+    invoice.createdBy,
+    `ออกใบแจ้งหนี้ใหม่\nเลขที่: ${invoice.invoiceNo}\nรายการ: ${invoice.description}\nยอดรวม: ${invoice.totalAmount.toLocaleString('th-TH')} บาท`
+  );
 
   return res.json({ ok: true, invoice });
 });
@@ -1109,6 +1334,11 @@ app.patch('/api/invoices/:invoiceId/status', async (req, res) => {
   }
 
   await invoicesCollection.updateOne({ id: invoiceId }, { $set: { status } });
+  const invoice = await invoicesCollection.findOne({ id: invoiceId }, { projection: { _id: 0 } });
+  await notifyCustomer(
+    invoice?.createdBy,
+    `อัปเดตสถานะใบแจ้งหนี้\nเลขที่: ${invoice?.invoiceNo ?? invoiceId}\nสถานะล่าสุด: ${status}`
+  );
 
   return res.json({ ok: true });
 });

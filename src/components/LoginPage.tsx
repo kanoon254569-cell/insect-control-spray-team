@@ -4,7 +4,8 @@ import {
   Bug,
   ArrowRight,
   Eye,
-  EyeOff
+  EyeOff,
+  MessageCircle
 } from 'lucide-react';
 
 type LoginValues = {
@@ -22,6 +23,7 @@ interface LoginPageProps {
 
 export default function LoginPage({ onLogin, onRegister, loading, error }: LoginPageProps) {
   const [registerAllowed, setRegisterAllowed] = useState(true);
+  const [lineLoginEnabled, setLineLoginEnabled] = useState(false);
 
   React.useEffect(() => {
     let active = true;
@@ -32,6 +34,9 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
         const data = await res.json();
         if (active && typeof data.registrationDisabled === 'boolean') {
           setRegisterAllowed(!data.registrationDisabled);
+        }
+        if (active && typeof data.lineLoginEnabled === 'boolean') {
+          setLineLoginEnabled(data.lineLoginEnabled);
         }
       } catch {}
     })();
@@ -110,6 +115,15 @@ export default function LoginPage({ onLogin, onRegister, loading, error }: Login
             <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
               ระบบถูกตั้งค่าให้มีบัญชีเดียวเท่านั้น การสมัครใหม่ถูกปิดไว้
             </div>
+          )}
+          {lineLoginEnabled && (
+            <a
+              href="/api/auth/line/start"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-[#06C755] px-5 py-3.5 text-sm font-extrabold text-white shadow-lg shadow-emerald-900/15 transition hover:-translate-y-0.5 hover:bg-[#05b34d]"
+            >
+              <MessageCircle className="h-4 w-4" />
+              เข้าสู่ระบบด้วย LINE
+            </a>
           )}
 
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>

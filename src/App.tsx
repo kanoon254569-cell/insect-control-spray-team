@@ -73,6 +73,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lineError = params.get('line_error');
+    if (!lineError) return;
+
+    setAuthError('เข้าสู่ระบบด้วย LINE ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+    window.history.replaceState({}, '', window.location.pathname);
+  }, []);
+
+  useEffect(() => {
     let active = true;
 
     const syncSession = async () => {
