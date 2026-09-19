@@ -15,6 +15,10 @@ import {
   INITIAL_INVOICES,
   INITIAL_PACKAGES
 } from './src/data';
+import {
+  sendLineNotification,
+  formatThailandDateTime
+} from './src/services/line';
 import { resolvePortalRole } from './src/auth';
 import { extractReceiptMetadata } from './src/payment';
 import type {
@@ -481,6 +485,19 @@ app.post('/api/login', async (req, res) => {
     // Create session for team member and preserve their team role and team assignment
     const role = resolvePortalRole(teamMember.role);
     const session = await createSession(role, normalizedUsername, teamMember.role, teamMember.teamId, teamMember.teamName);
+
+    // LINE แจ้งเตือน Team Member Login
+    void sendLineNotification(
+      [
+        '🔐 มีการเข้าสู่ระบบ NP Place Control',
+        '',
+        `👤 ชื่อ: ${session.displayName}`,
+        `🪪 Username: ${session.username}`,
+        `🎭 Role: ${session.teamRole ?? session.role}`,
+        `🕐 เวลา: ${formatThailandDateTime()}`
+      ].join('\n')
+    );
+
     res.setHeader(
       'Set-Cookie',
       serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -510,6 +527,19 @@ app.post('/api/login', async (req, res) => {
   }
 
   const session = await createSession(role, normalizedUsername);
+
+  // LINE แจ้งเตือน Regular User Login
+  void sendLineNotification(
+    [
+      '🔐 มีการเข้าสู่ระบบ NP Place Control',
+      '',
+      `👤 ชื่อ: ${session.displayName}`,
+      `🪪 Username: ${session.username}`,
+      `🎭 Role: ${session.role}`,
+      `🕐 เวลา: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
+
   res.setHeader(
     'Set-Cookie',
     serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -556,6 +586,19 @@ app.post('/api/register', async (req, res) => {
 
   const user = await createUser(normalizedUsername, password, role, normalizeDisplayName(displayName, normalizedUsername));
   const session = await createSession(user.role, user.username);
+
+  // ✅ LINE แจ้งเตือนสมัครสมาชิกใหม่
+  void sendLineNotification(
+    [
+      '👤 มีสมาชิกใหม่สมัครใช้งาน',
+      '',
+      `ชื่อ: ${session.displayName}`,
+      `Username: ${session.username}`,
+      `Role: ${session.role}`,
+      `🕐 เวลา: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
+
   res.setHeader(
     'Set-Cookie',
     serializeCookie(SESSION_COOKIE, session.sessionId, {
@@ -714,6 +757,20 @@ app.post('/api/problems', async (req, res) => {
 
   await problemsCollection.insertOne(entry);
 
+  void sendLineNotification(
+    [
+      '🚨 มีลูกค้าแจ้งปัญหาใหม่',
+      '',
+      `👤 ลูกค้า: ${entry.customerName}`,
+      `📞 โทร: ${entry.customerPhone}`,
+      `🐜 ประเภทแมลง: ${entry.pestType}`,
+      `⚠️ ความเร่งด่วน: ${entry.urgency}`,
+      `📍 ที่อยู่: ${entry.address}`,
+      `📝 รายละเอียด: ${entry.description}`,
+      `🕐 เวลา: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
+
   return res.json({ ok: true, problem: entry });
 });
 
@@ -762,6 +819,21 @@ app.post('/api/bookings', async (req, res) => {
 
   await bookingsCollection.insertOne(booking);
   await invoicesCollection.insertOne(invoice);
+
+  void sendLineNotification(
+    [
+      '📅 มีการจองบริการใหม่',
+      '',
+      `👤 ลูกค้า: ${booking.customerName}`,
+      `📞 โทร: ${booking.customerPhone}`,
+      `📦 แพ็กเกจ: ${booking.packageName}`,
+      `💰 ราคา: ${booking.price.toLocaleString('th-TH')} บาท`,
+      `📆 วันที่นัดหมาย: ${booking.bookingDate}`,
+      `📍 ที่อยู่: ${booking.address}`,
+      `🧾 Invoice: ${booking.invoiceNo ?? '-'}`,
+      `🕐 เวลา: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
 
   return res.json({ ok: true, booking, invoice });
 });
@@ -812,6 +884,20 @@ app.post('/api/invoices/:invoiceId/receipt', async (req, res) => {
     }
   );
 
+  void sendLineNotification(
+    [
+      '💰 ลูกค้าชำระเงินสำเร็จ',
+      '',
+      `🧾 Invoice: ${invoice.invoiceNo}`,
+      `👤 ลูกค้า: ${invoice.customerName}`,
+      `💵 จำนวนเงิน: ${numericAmount.toLocaleString('th-TH')} บาท`,
+      `👤 ผู้โอน: ${payerName}`,
+      `🕐 เวลาโอน: ${transferTime}`,
+      '✅ สถานะ: ชำระเงินแล้ว',
+      `📌 ตรวจสอบเมื่อ: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
+
   return res.json({ ok: true, message: 'สลิปตรวจสอบแล้วและสถานะชำระเงินอัปเดตเป็น Paid แล้ว' });
 });
 
@@ -854,6 +940,22 @@ app.post('/api/jobs/assign', async (req, res) => {
     await bookingsCollection.updateOne({ id: sourceId }, { $set: { status: 'กำลังจัดทีมงาน' } });
   }
 
+  void sendLineNotification(
+    [
+      '👷 มีการมอบหมายงานใหม่',
+      '',
+      `🛠 งาน: ${job.title}`,
+      `👥 ทีม: ${job.assignedTeam}`,
+      `👤 ลูกค้า: ${job.customerName}`,
+      `📞 โทร: ${job.customerPhone}`,
+      `📍 สถานที่: ${job.address}`,
+      `📆 วันที่เข้าบริการ: ${job.appointmentDate}`,
+      `📝 รายละเอียด: ${job.description}`,
+      `📌 สถานะ: ${job.status}`,
+      `🕐 เวลา: ${formatThailandDateTime()}`
+    ].join('\n')
+  );
+
   return res.json({ ok: true, job: cleanMongo(job) });
 });
 
@@ -876,6 +978,41 @@ app.patch('/api/jobs/:jobId/status', async (req, res) => {
   }
 
   await syncJobSourceStatus(job, status as JobStatus, updates);
+
+  if (status === 'ส่งงานแล้ว') {
+    void sendLineNotification(
+      [
+        '✅ ช่างส่งงานแล้ว',
+        '',
+        `🛠 งาน: ${job.title}`,
+        `👥 ทีม: ${job.assignedTeam}`,
+        `👤 ลูกค้า: ${job.customerName}`,
+        `📍 สถานที่: ${job.address}`,
+        `📌 สถานะ: ${status}`,
+        updates?.notesByTech
+          ? `📝 หมายเหตุจากช่าง: ${updates.notesByTech}`
+          : '',
+        `🕐 เวลา: ${formatThailandDateTime()}`
+      ]
+        .filter(Boolean)
+        .join('\n')
+    );
+  }
+
+  if (status === 'เสร็จสิ้นและตรวจรับ') {
+    void sendLineNotification(
+      [
+        '🎉 งานเสร็จสิ้นและตรวจรับแล้ว',
+        '',
+        `🛠 งาน: ${job.title}`,
+        `👥 ทีม: ${job.assignedTeam}`,
+        `👤 ลูกค้า: ${job.customerName}`,
+        `📍 สถานที่: ${job.address}`,
+        `📌 สถานะ: ${status}`,
+        `🕐 เวลา: ${formatThailandDateTime()}`
+      ].join('\n')
+    );
+  }
 
   return res.json({ ok: true, job: await jobsCollection.findOne({ id: jobId }, { projection: { _id: 0 } }) });
 });
