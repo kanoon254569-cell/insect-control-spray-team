@@ -11,7 +11,12 @@ function hashPassword(password: string) {
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/insect_control_spray_team?schema=public';
-  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+  const prisma = new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString: databaseUrl,
+      ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : undefined
+    })
+  });
 
   const username = process.env.SEED_USERNAME || 'admin';
   const password = process.env.SEED_PASSWORD || 'admin1234';

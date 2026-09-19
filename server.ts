@@ -47,7 +47,12 @@ if (!process.env.DATABASE_URL && (process.env.RENDER || process.env.NODE_ENV ===
 }
 
 const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/insect_control_spray_team?schema=public';
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({
+    connectionString: databaseUrl,
+    ssl: databaseUrl.includes('render.com') ? { rejectUnauthorized: false } : undefined
+  })
+});
 
 app.use(express.json({ limit: '10mb' }));
 
