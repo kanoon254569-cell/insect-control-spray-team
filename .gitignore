@@ -6,7 +6,8 @@ coverage/
 *.log
 .sqlite
 data/
-.env*
+.env
+.env/*
 !.env.example
 data/user.json
 .env.local
