@@ -308,8 +308,12 @@ function getLineRedirectUri(req: express.Request) {
   return `${getAppUrl(req)}/api/auth/line/callback`;
 }
 
+function isLineLoginConfigured() {
+  return Boolean(LINE_LOGIN_CHANNEL_ID && /^\d+$/.test(LINE_LOGIN_CHANNEL_ID) && LINE_LOGIN_CHANNEL_SECRET);
+}
+
 async function verifyLineIdToken(idToken: string): Promise<LineIdTokenProfile> {
-  if (!LINE_LOGIN_CHANNEL_ID) {
+  if (!LINE_LOGIN_CHANNEL_ID || !/^\d+$/.test(LINE_LOGIN_CHANNEL_ID)) {
     throw new Error('LINE Login channel ID is not configured');
   }
 
@@ -336,7 +340,7 @@ async function verifyLineIdToken(idToken: string): Promise<LineIdTokenProfile> {
 }
 
 async function exchangeLineCodeForProfile(req: express.Request, code: string) {
-  if (!LINE_LOGIN_CHANNEL_ID || !LINE_LOGIN_CHANNEL_SECRET) {
+  if (!isLineLoginConfigured()) {
     throw new Error('LINE Login is not configured');
   }
 
@@ -638,8 +642,10 @@ app.get('/api/me', async (req, res) => {
 });
 
 app.get('/api/auth/line/start', (req, res) => {
-  if (!LINE_LOGIN_CHANNEL_ID || !LINE_LOGIN_CHANNEL_SECRET) {
-    return res.status(503).json({ message: 'ยังไม่ได้ตั้งค่า LINE Login' });
+  if (!isLineLoginConfigured()) {
+    return res.status(503).json({
+      message: 'ยังไม่ได้ตั้งค่า LINE Login ให้ถูกต้อง: LINE_LOGIN_CHANNEL_ID ต้องเป็น Channel ID แบบตัวเลข'
+    });
   }
 
   const state = randomBytes(24).toString('hex');
@@ -814,7 +820,7 @@ app.post('/api/register', async (req, res) => {
 app.get('/api/config', async (_req, res) => {
   return res.json({
     registrationDisabled: Boolean(SINGLE_USER_CONFIG && SINGLE_USER_CONFIG.enforce),
-    lineLoginEnabled: Boolean(LINE_LOGIN_CHANNEL_ID && LINE_LOGIN_CHANNEL_SECRET)
+    lineLoginEnabled: isLineLoginConfigured()
   });
 });
 
