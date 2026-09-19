@@ -43,6 +43,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SESSION_COOKIE = 'bugguard_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
+const LINE_LOGIN_STATE_COOKIE = 'line_login_state';
+const LINE_LOGIN_STATE_TTL_MS = 1000 * 60 * 10;
 
 if (!process.env.DATABASE_URL && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
   throw new Error(
@@ -446,6 +448,147 @@ await seedDatabase();
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'postgresql' });
+});
+
+app.get('/api/auth/line', (_req, res) => {
+  const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
+  const callbackUrl = process.env.LINE_LOGIN_CALLBACK_URL;
+
+  if (!channelId || !callbackUrl) {
+    return res.status(503).json({ message: 'LINE Login ยังไม่ได้ตั้งค่า' });
+  }
+
+  const state = randomBytes(32).toString('hex');
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(LINE_LOGIN_STATE_COOKIE, state, {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/api/auth/line',
+      maxAge: LINE_LOGIN_STATE_TTL_MS
+    })
+  );
+
+  const authorizationUrl = new URL('https://access.line.me/oauth2/v2.1/authorize');
+  authorizationUrl.searchParams.set('response_type', 'code');
+  authorizationUrl.searchParams.set('client_id', channelId);
+  authorizationUrl.searchParams.set('redirect_uri', callbackUrl);
+  authorizationUrl.searchParams.set('state', state);
+  authorizationUrl.searchParams.set('scope', 'profile openid');
+
+  return res.redirect(authorizationUrl.toString());
+});
+
+app.get('/api/auth/line/callback', async (req, res) => {
+  const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
+  const channelSecret = process.env.LINE_LOGIN_CHANNEL_SECRET;
+  const callbackUrl = process.env.LINE_LOGIN_CALLBACK_URL;
+  const frontendUrl = process.env.APP_URL ?? 'http://localhost:3000';
+  const { code, state } = req.query;
+  const cookies = parseCookies(req.headers.cookie || '');
+  const savedState = cookies[LINE_LOGIN_STATE_COOKIE];
+
+  const redirectWithError = (message: string) => {
+    const redirectUrl = new URL(frontendUrl);
+    redirectUrl.searchParams.set('lineLogin', 'error');
+    redirectUrl.searchParams.set('message', message);
+    return res.redirect(redirectUrl.toString());
+  };
+
+  if (!channelId || !channelSecret || !callbackUrl) {
+    return redirectWithError('LINE Login ยังไม่ได้ตั้งค่า');
+  }
+
+  if (
+    typeof code !== 'string' ||
+    typeof state !== 'string' ||
+    !savedState ||
+    savedState.length !== state.length ||
+    !timingSafeEqual(Buffer.from(savedState), Buffer.from(state))
+  ) {
+    return redirectWithError('LINE Login state ไม่ถูกต้องหรือหมดอายุ');
+  }
+
+  res.setHeader(
+    'Set-Cookie',
+    serializeCookie(LINE_LOGIN_STATE_COOKIE, '', {
+      httpOnly: true,
+      sameSite: 'Lax',
+      path: '/api/auth/line',
+      maxAge: 0
+    })
+  );
+
+  try {
+    const tokenResponse = await fetch('https://api.line.me/oauth2/v2.1/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: callbackUrl,
+        client_id: channelId,
+        client_secret: channelSecret
+      })
+    });
+
+    if (!tokenResponse.ok) {
+      return redirectWithError('ไม่สามารถยืนยันตัวตนกับ LINE ได้');
+    }
+
+    const tokenData = (await tokenResponse.json()) as { access_token?: string };
+    if (!tokenData.access_token) {
+      return redirectWithError('LINE ไม่ส่ง access token กลับมา');
+    }
+
+    const profileResponse = await fetch('https://api.line.me/v2/profile', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` }
+    });
+    if (!profileResponse.ok) {
+      return redirectWithError('ไม่สามารถอ่านข้อมูลโปรไฟล์ LINE ได้');
+    }
+
+    const profile = (await profileResponse.json()) as { userId?: string; displayName?: string };
+    if (!profile.userId) {
+      return redirectWithError('ข้อมูลบัญชี LINE ไม่ครบถ้วน');
+    }
+
+    const username = `line_${profile.userId}`;
+    const role: PortalRole = 'customer';
+    let user = await users.findOne({ username, role }, { projection: { _id: 0 } });
+    if (!user) {
+      user = await createUser(
+        username,
+        randomBytes(32).toString('hex'),
+        role,
+        normalizeDisplayName(profile.displayName, username)
+      );
+    }
+
+    const session = await createSession(user.role, user.username);
+    res.setHeader(
+      'Set-Cookie',
+      [
+        serializeCookie(LINE_LOGIN_STATE_COOKIE, '', {
+          httpOnly: true,
+          sameSite: 'Lax',
+          path: '/api/auth/line',
+          maxAge: 0
+        }),
+        serializeCookie(SESSION_COOKIE, session.sessionId, {
+          httpOnly: true,
+          sameSite: 'Lax',
+          path: '/',
+          maxAge: SESSION_TTL_MS
+        })
+      ]
+    );
+
+    return res.redirect(frontendUrl);
+  } catch (error) {
+    console.error('LINE Login callback failed', error);
+    return redirectWithError('เกิดข้อผิดพลาดระหว่างเข้าสู่ระบบด้วย LINE');
+  }
 });
 
 app.get('/api/me', async (req, res) => {
