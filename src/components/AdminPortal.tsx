@@ -140,7 +140,7 @@ export default function AdminPortal({
     nextVisitDate: '',
     startDate: '',
     endDate: '',
-    status: 'เปิดใช้งาน' as const,
+    status: 'เปิดใช้งาน' as Contract['status'],
     price: 12000
   });
   const [contractUpdateLoading, setContractUpdateLoading] = useState(false);

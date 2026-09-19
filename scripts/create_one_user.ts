@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { MongoClient } from 'mongodb';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes, randomUUID, scryptSync } from 'crypto';
 
 function hashPassword(password: string) {
@@ -9,11 +10,8 @@ function hashPassword(password: string) {
 }
 
 async function main() {
-  const mongoUri = process.env.MONGODB_URI || process.env.DATABASE_URL || 'mongodb://127.0.0.1:27017/insect_control_spray_team';
-  const client = new MongoClient(mongoUri);
-  await client.connect();
-  const db = client.db(process.env.MONGODB_DB || undefined);
-  const users = db.collection('users');
+  const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/insect_control_spray_team?schema=public';
+  const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
 
   const username = process.env.SEED_USERNAME || 'admin';
   const password = process.env.SEED_PASSWORD || 'admin1234';
@@ -21,11 +19,15 @@ async function main() {
   const displayName = process.env.SEED_DISPLAYNAME || 'Administrator';
 
   const normalized = username.trim().toLowerCase();
-  const existing = await users.findOne({ username: normalized, role });
+  const existing = await prisma.user.findFirst({ where: { username: normalized, role } });
   if (existing) {
     console.log('User already exists, updating password/displayName');
-    await users.updateOne({ username: normalized, role }, { $set: { passwordHash: hashPassword(password), displayName } });
+    await prisma.user.update({
+      where: { username_role: { username: normalized, role } },
+      data: { passwordHash: hashPassword(password), displayName }
+    });
     console.log('Updated existing user.');
+    await prisma.$disconnect();
     process.exit(0);
   }
 
@@ -38,8 +40,9 @@ async function main() {
     createdAt: new Date().toISOString()
   };
 
-  await users.insertOne(user);
+  await prisma.user.create({ data: user });
   console.log('Inserted user', normalized);
+  await prisma.$disconnect();
   process.exit(0);
 }
 

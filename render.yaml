@@ -4,10 +4,8 @@ services:
     env: node
     plan: free
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    startCommand: npm run db:deploy && npm start
     autoDeploy: true
     envVars:
-      - key: MONGODB_URI
-        sync: false
-      - key: MONGODB_DB
+      - key: DATABASE_URL
         sync: false

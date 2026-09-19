@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
-import { MongoClient, Db, Collection } from 'mongodb';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
@@ -39,24 +40,14 @@ const __dirname = path.dirname(__filename);
 const SESSION_COOKIE = 'bugguard_session';
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 
-function getMongoUri() {
-  if (process.env.MONGODB_URI) return process.env.MONGODB_URI;
-  if (process.env.DATABASE_URL?.startsWith('mongodb://') || process.env.DATABASE_URL?.startsWith('mongodb+srv://')) {
-    return process.env.DATABASE_URL;
-  }
-  return null;
-}
-
-const mongoUri = getMongoUri();
-if (!mongoUri && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
+if (!process.env.DATABASE_URL && (process.env.RENDER || process.env.NODE_ENV === 'production')) {
   throw new Error(
-    'Missing MongoDB configuration. Set MONGODB_URI on Render, for example mongodb+srv://USER:PASSWORD@CLUSTER.mongodb.net/insect_control_spray_team'
+    'Missing PostgreSQL configuration. Set DATABASE_URL, for example postgresql://USER:PASSWORD@HOST:5432/insect_control_spray_team?schema=public'
   );
 }
 
-const mongoClient = new MongoClient(mongoUri ?? 'mongodb://127.0.0.1:27017/insect_control_spray_team');
-await mongoClient.connect();
-const database: Db = mongoClient.db(process.env.MONGODB_DB || undefined);
+const databaseUrl = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:5432/insect_control_spray_team?schema=public';
+const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -105,16 +96,63 @@ type UserRow = {
 
 type JobDocument = TechnicianJob & { createdAt: string };
 
-const users = database.collection<UserRow>('users');
-const sessions = database.collection<SessionRow>('sessions');
-const teamMembersCollection = database.collection<TeamMember>('teamMembers');
-const teamsCollection = database.collection<Team>('teams');
-const packagesCollection = database.collection<ServicePackage>('packages');
-const problemsCollection = database.collection<PestProblem>('problems');
-const bookingsCollection = database.collection<Booking>('bookings');
-const contractsCollection = database.collection<Contract>('contracts');
-const jobsCollection = database.collection<JobDocument>('jobs');
-const invoicesCollection = database.collection<Invoice>('invoices');
+type SortSpec = Record<string, 1 | -1>;
+type MongoStyleUpdate<T> = { $set?: Partial<T> };
+
+function normalizeWhere(filter: Record<string, any> = {}) {
+  return Object.fromEntries(
+    Object.entries(filter).map(([key, value]) => {
+      if (value && typeof value === 'object' && '$ne' in value) {
+        return [key, { not: value.$ne }];
+      }
+      return [key, value];
+    })
+  );
+}
+
+function normalizeOrderBy(sortSpec: SortSpec = {}) {
+  return Object.entries(sortSpec).map(([field, direction]) => ({ [field]: direction === -1 ? 'desc' : 'asc' }));
+}
+
+function stripUndefined<T extends Record<string, any>>(data: T): T {
+  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined)) as T;
+}
+
+function createPrismaCollection<T extends Record<string, any>>(delegate: any) {
+  return {
+    createIndex: async (..._args: unknown[]) => undefined,
+    countDocuments: () => delegate.count(),
+    findOne: (filter: Record<string, any>, _options?: unknown) => delegate.findFirst({ where: normalizeWhere(filter) }) as Promise<T | null>,
+    insertOne: (document: T) => delegate.create({ data: stripUndefined(document) }),
+    insertMany: (documents: T[]) => delegate.createMany({ data: documents.map(stripUndefined), skipDuplicates: true }),
+    updateOne: (filter: Record<string, any>, update: MongoStyleUpdate<T>) =>
+      delegate.updateMany({ where: normalizeWhere(filter), data: stripUndefined(update.$set ?? {}) }),
+    updateMany: (filter: Record<string, any>, update: MongoStyleUpdate<T>) =>
+      delegate.updateMany({ where: normalizeWhere(filter), data: stripUndefined(update.$set ?? {}) }),
+    deleteOne: (filter: Record<string, any>) => delegate.deleteMany({ where: normalizeWhere(filter) }),
+    find: (filter: Record<string, any> = {}, _options?: unknown) => ({
+      sort: (sortSpec: SortSpec) => ({
+        toArray: () =>
+          delegate.findMany({
+            where: normalizeWhere(filter),
+            orderBy: normalizeOrderBy(sortSpec)
+          }) as Promise<T[]>
+      }),
+      toArray: () => delegate.findMany({ where: normalizeWhere(filter) }) as Promise<T[]>
+    })
+  };
+}
+
+const users = createPrismaCollection<UserRow>(prisma.user);
+const sessions = createPrismaCollection<SessionRow>(prisma.session);
+const teamMembersCollection = createPrismaCollection<TeamMember>(prisma.teamMember);
+const teamsCollection = createPrismaCollection<Team>(prisma.team);
+const packagesCollection = createPrismaCollection<ServicePackage>(prisma.servicePackage);
+const problemsCollection = createPrismaCollection<PestProblem>(prisma.pestProblem);
+const bookingsCollection = createPrismaCollection<Booking>(prisma.booking);
+const contractsCollection = createPrismaCollection<Contract>(prisma.contract);
+const jobsCollection = createPrismaCollection<JobDocument>(prisma.job);
+const invoicesCollection = createPrismaCollection<Invoice>(prisma.invoice);
 
 async function analyzeReceiptImage(dataUrl: string) {
   if (!dataUrl.startsWith('data:image/')) {
@@ -398,7 +436,7 @@ async function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, update
 await seedDatabase();
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'mongodb' });
+  res.json({ ok: true, service: 'insect-control-spray-team-auth', database: 'postgresql' });
 });
 
 app.get('/api/me', async (req, res) => {

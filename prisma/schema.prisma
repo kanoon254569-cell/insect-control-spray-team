@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String  @id
+  username     String
+  passwordHash String  @db.Text
+  role         String
+  displayName  String
+  phone        String?
+  address      String? @db.Text
+  createdAt    String
+
+  @@unique([username, role])
+  @@map("users")
+}
+
+model Session {
+  sessionId   String  @id
+  role        String
+  username    String
+  displayName String
+  phone       String?
+  address     String? @db.Text
+  expiresAt   Float
+  teamRole    String?
+  teamId      String?
+  teamName    String?
+
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model TeamMember {
+  id           String  @id
+  name         String
+  phone        String
+  email        String
+  username     String  @unique
+  passwordHash String? @db.Text
+  role         String
+  teamId       String?
+  teamName     String?
+  createdAt    String
+  status       String
+
+  @@map("team_members")
+}
+
+model Team {
+  id          String  @id
+  name        String  @unique
+  description String? @db.Text
+  createdAt   String
+
+  @@map("teams")
+}
+
+model ServicePackage {
+  id          String @id
+  name        String
+  price       Float
+  duration    String @db.Text
+  description String @db.Text
+  guarantee   String @db.Text
+  features    Json
+
+  @@map("packages")
+}
+
+model PestProblem {
+  id              String  @id
+  customerName    String
+  customerPhone   String
+  address         String  @db.Text
+  pestType        String
+  description     String  @db.Text
+  urgency         String
+  createdAt       String
+  createdBy       String?
+  status          String
+  assignedTeam    String?
+  appointmentDate String?
+
+  @@map("problems")
+}
+
+model Booking {
+  id            String  @id
+  packageId     String
+  packageName   String
+  customerName  String
+  customerPhone String
+  address       String  @db.Text
+  bookingDate   String
+  price         Float
+  status        String
+  invoiceNo     String?
+  createdBy     String?
+
+  @@map("bookings")
+}
+
+model Contract {
+  id              String @id
+  customerName    String
+  customerPhone   String
+  address         String @db.Text
+  packageName     String
+  startDate       String
+  endDate         String
+  totalVisits     Int
+  completedVisits Int
+  nextVisitDate   String
+  price           Float
+  status          String
+  documentNo      String
+  createdBy       String?
+
+  @@map("contracts")
+}
+
+model Job {
+  id              String  @id
+  sourceId        String
+  sourceType      String
+  title           String
+  description     String  @db.Text
+  customerName    String
+  customerPhone   String
+  address         String  @db.Text
+  appointmentDate String
+  assignedTeam    String
+  status          String
+  notesByTech     String? @db.Text
+  imageReport     String? @db.Text
+  chemicalsUsed   Json
+  completedAt     String?
+  createdBy       String?
+  createdAt       String
+
+  @@map("jobs")
+}
+
+model Invoice {
+  id                String  @id
+  invoiceNo         String  @unique
+  customerName      String
+  customerPhone     String
+  address           String  @db.Text
+  description       String  @db.Text
+  amount            Float
+  vat               Float
+  totalAmount       Float
+  status            String
+  dueDate           String
+  createdAt         String
+  receiptDataUrl    String? @db.Text
+  payerName         String?
+  transferTime      String?
+  paymentVerifiedAt String?
+  paymentReference  String?
+  createdBy         String?
+
+  @@map("invoices")
+}
