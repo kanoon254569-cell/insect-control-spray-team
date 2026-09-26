@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="620" viewBox="0 0 1400 620" role="img" aria-labelledby="title desc">
+  <title id="title">ขั้นตอนงานบริการกำจัดแมลง</title>
+  <desc id="desc">แสดงทางเดินแจ้งปัญหาและจองบริการ ตั้งแต่งานลูกค้าถึงช่างและการตรวจรับ</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#526273"/></marker>
+    <style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:27px;font-weight:700}.head{font-size:17px;font-weight:700}.label{font-size:14px}.small{font-size:12px}.node{stroke-width:2}</style>
+  </defs>
+  <rect width="1400" height="620" fill="#f5f8fa"/>
+  <text x="48" y="52" class="title">ขั้นตอนงานบริการกำจัดแมลง</text>
+  <text x="48" y="95" class="head">แจ้งปัญหา → มอบหมายช่าง → ตรวจรับ</text>
+  <g>
+    <rect x="55" y="135" width="225" height="100" rx="10" fill="#e8f4f1" stroke="#5a9e8b" class="node"/>
+    <text x="167" y="171" text-anchor="middle" class="head">ลูกค้าแจ้งปัญหา</text><text x="167" y="199" text-anchor="middle" class="small">บันทึกเป็น PestProblem</text>
+    <rect x="350" y="135" width="225" height="100" rx="10" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+    <text x="462" y="171" text-anchor="middle" class="head">ผู้ดูแลจัดคิว</text><text x="462" y="199" text-anchor="middle" class="small">เลือกทีมและวันนัด</text>
+    <rect x="645" y="135" width="225" height="100" rx="10" fill="#e8f2f8" stroke="#5687a7" class="node"/>
+    <text x="757" y="171" text-anchor="middle" class="head">สร้างงานช่าง</text><text x="757" y="199" text-anchor="middle" class="small">Job อ้างอิงปัญหาหรือการจอง</text>
+    <rect x="940" y="135" width="225" height="100" rx="10" fill="#edf1f8" stroke="#788db0" class="node"/>
+    <text x="1052" y="171" text-anchor="middle" class="head">ทีมช่างทำงาน</text><text x="1052" y="199" text-anchor="middle" class="small">บันทึกสถานะและผลหน้างาน</text>
+    <rect x="1175" y="135" width="180" height="100" rx="10" fill="#e9f4f1" stroke="#5a9e8b" class="node"/>
+    <text x="1265" y="171" text-anchor="middle" class="head">ตรวจรับ</text><text x="1265" y="199" text-anchor="middle" class="small">สร้างสัญญา</text>
+    <path d="M280 185 H350 M575 185 H645 M870 185 H940 M1165 185 H1175" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+  </g>
+  <text x="48" y="315" class="head">สถานะงานช่าง</text>
+  <g>
+    <rect x="55" y="355" width="235" height="105" rx="10" fill="#fff" stroke="#788db0" class="node"/>
+    <text x="172" y="395" text-anchor="middle" class="label">กำลังเตรียมตัว</text><text x="172" y="423" text-anchor="middle" class="small">ผู้ดูแลมอบหมายงาน</text>
+    <rect x="330" y="355" width="235" height="105" rx="10" fill="#fff" stroke="#788db0" class="node"/>
+    <text x="447" y="395" text-anchor="middle" class="label">กำลังเดินทาง</text><text x="447" y="423" text-anchor="middle" class="small">ช่างออกเดินทาง</text>
+    <rect x="605" y="355" width="235" height="105" rx="10" fill="#fff" stroke="#5687a7" class="node"/>
+    <text x="722" y="395" text-anchor="middle" class="label">เริ่มดำเนินงาน</text><text x="722" y="423" text-anchor="middle" class="small">เริ่มงานที่หน้างาน</text>
+    <rect x="880" y="355" width="235" height="105" rx="10" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+    <text x="997" y="395" text-anchor="middle" class="label">ส่งงานแล้ว</text><text x="997" y="423" text-anchor="middle" class="small">ส่งรายงานให้ผู้ดูแล</text>
+    <rect x="1155" y="355" width="200" height="105" rx="10" fill="#e9f4f1" stroke="#5a9e8b" class="node"/>
+    <text x="1255" y="395" text-anchor="middle" class="label">ตรวจรับเสร็จสิ้น</text><text x="1255" y="423" text-anchor="middle" class="small">ผู้ดูแลอนุมัติ</text>
+    <path d="M290 407 H330 M565 407 H605 M840 407 H880 M1115 407 H1155" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+  </g>
+  <rect x="55" y="510" width="1290" height="65" rx="8" fill="#fff" stroke="#cbd5df"/>
+  <text x="75" y="538" class="label">การจอง:</text><text x="155" y="538" class="small">เลือกแพ็กเกจ → สร้าง Booking และ Invoice → ส่งสลิป → OCR อ่านข้อมูล → ผู้ดูแลยืนยันการชำระเงิน</text>
+  <text x="75" y="559" class="small">เมื่อผู้ดูแลตรวจรับงาน ระบบสร้าง Contract และแจ้งลูกค้าผ่าน LINE ตามการตั้งค่า</text>
+</svg>

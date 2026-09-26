@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
+  <title id="title">สถาปัตยกรรมระบบ NP Place Control</title>
+  <desc id="desc">ผู้ใช้เรียกใช้งานพอร์ทัล React ผ่าน Express API ซึ่งเชื่อมต่อ PostgreSQL, LINE และ OCR</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#526273"/></marker>
+    <style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:27px;font-weight:700}.head{font-size:19px;font-weight:700}.label{font-size:15px}.small{font-size:13px}.node{stroke-width:2}</style>
+  </defs>
+  <rect width="1200" height="520" fill="#f5f8fa"/>
+  <text x="48" y="52" class="title">สถาปัตยกรรมระบบ NP Place Control</text>
+  <rect x="45" y="115" width="285" height="315" rx="12" fill="#fff" stroke="#cbd5df" class="node"/>
+  <text x="187" y="151" text-anchor="middle" class="head">ผู้ใช้งาน</text>
+  <rect x="75" y="180" width="225" height="58" rx="8" fill="#e8f4f1" stroke="#5a9e8b" class="node"/>
+  <text x="187" y="216" text-anchor="middle" class="label">ลูกค้า</text>
+  <rect x="75" y="255" width="225" height="58" rx="8" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+  <text x="187" y="291" text-anchor="middle" class="label">ผู้ดูแลระบบ</text>
+  <rect x="75" y="330" width="225" height="58" rx="8" fill="#edf1f8" stroke="#788db0" class="node"/>
+  <text x="187" y="366" text-anchor="middle" class="label">หัวหน้าทีม / ช่าง</text>
+
+  <rect x="405" y="115" width="380" height="315" rx="12" fill="#fff" stroke="#5687a7" class="node"/>
+  <text x="595" y="151" text-anchor="middle" class="head">เว็บแอปและ API</text>
+  <rect x="445" y="180" width="300" height="72" rx="8" fill="#e8f2f8" stroke="#5687a7" class="node"/>
+  <text x="595" y="210" text-anchor="middle" class="label">React Portals</text>
+  <text x="595" y="233" text-anchor="middle" class="small">ลูกค้า · ผู้ดูแล · ช่าง</text>
+  <rect x="445" y="285" width="300" height="92" rx="8" fill="#e9f4f1" stroke="#5a9e8b" class="node"/>
+  <text x="595" y="319" text-anchor="middle" class="label">Express API</text>
+  <text x="595" y="345" text-anchor="middle" class="small">เข้าสู่ระบบ · งาน · ทีม · ใบแจ้งหนี้</text>
+  <text x="595" y="365" text-anchor="middle" class="small">โปรไฟล์ · สัญญา</text>
+
+  <rect x="875" y="110" width="275" height="105" rx="12" fill="#fff" stroke="#ad8751" class="node"/>
+  <text x="1012" y="150" text-anchor="middle" class="head">PostgreSQL</text>
+  <text x="1012" y="180" text-anchor="middle" class="small">ผ่าน Prisma Adapter</text>
+  <rect x="875" y="250" width="275" height="75" rx="12" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="1012" y="281" text-anchor="middle" class="head">LINE Platform</text>
+  <text x="1012" y="305" text-anchor="middle" class="small">Login และการแจ้งเตือน</text>
+  <rect x="875" y="360" width="275" height="70" rx="12" fill="#fff" stroke="#b56f5c" class="node"/>
+  <text x="1012" y="391" text-anchor="middle" class="head">Tesseract.js</text>
+  <text x="1012" y="414" text-anchor="middle" class="small">อ่านข้อความจากสลิป</text>
+
+  <path d="M330 272 H405" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="368" y="260" text-anchor="middle" class="small">HTTPS / JSON</text>
+  <path d="M785 300 H830 V162 H875" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M785 320 H830 V287 H875" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M785 342 H830 V395 H875" fill="none" stroke="#526273" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>

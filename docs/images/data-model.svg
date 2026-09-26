@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+  <title id="title">โมเดลข้อมูลระบบ NP Place Control</title>
+  <desc id="desc">ตารางหลักในระบบและความสัมพันธ์เชิงตรรกะระหว่างบัญชี ทีม แพ็กเกจ ปัญหา การจอง งาน ใบแจ้งหนี้ และสัญญา</desc>
+  <defs>
+    <style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:27px;font-weight:700}.head{font-size:16px;font-weight:700}.label{font-size:12px}.small{font-size:11px}.box{fill:#fff;stroke:#7890a3;stroke-width:2}</style>
+  </defs>
+  <rect width="1200" height="760" fill="#f5f8fa"/>
+  <text x="42" y="48" class="title">โมเดลข้อมูลระบบ NP Place Control</text>
+  <text x="42" y="78" class="small">ความสัมพันธ์ในภาพอ้างอิงคีย์/ชื่อที่ระบบใช้; Prisma schema ไม่ได้กำหนด foreign key ระหว่างโมเดลเหล่านี้</text>
+  <g>
+    <rect x="55" y="115" width="215" height="120" rx="8" class="box"/><text x="72" y="143" class="head">User</text><text x="72" y="168" class="label">PK id · username · role</text><text x="72" y="190" class="label">displayName · passwordHash</text><text x="72" y="212" class="small">บัญชีผู้ใช้</text>
+    <rect x="55" y="275" width="215" height="105" rx="8" class="box"/><text x="72" y="303" class="head">Session</text><text x="72" y="328" class="label">PK sessionId · username</text><text x="72" y="350" class="label">role · expiresAt · teamId</text>
+    <rect x="55" y="425" width="215" height="120" rx="8" class="box"/><text x="72" y="453" class="head">Team / TeamMember</text><text x="72" y="478" class="label">Team: id · name</text><text x="72" y="500" class="label">Member: id · username · role</text><text x="72" y="522" class="label">teamId · status</text>
+
+    <rect x="350" y="115" width="220" height="115" rx="8" class="box"/><text x="367" y="143" class="head">ServicePackage</text><text x="367" y="168" class="label">PK id · name · price</text><text x="367" y="190" class="label">duration · features</text>
+    <rect x="350" y="275" width="220" height="130" rx="8" class="box"/><text x="367" y="303" class="head">PestProblem</text><text x="367" y="328" class="label">PK id · customer · status</text><text x="367" y="350" class="label">createdBy · assignedTeam</text><text x="367" y="372" class="label">appointmentDate</text>
+    <rect x="350" y="465" width="220" height="130" rx="8" class="box"/><text x="367" y="493" class="head">Booking</text><text x="367" y="518" class="label">PK id · packageId · packageName</text><text x="367" y="540" class="label">customer · bookingDate · status</text><text x="367" y="562" class="label">invoiceNo · createdBy</text>
+
+    <rect x="665" y="270" width="230" height="150" rx="8" fill="#e8f2f8" stroke="#5687a7" stroke-width="2"/><text x="682" y="300" class="head">Job</text><text x="682" y="326" class="label">PK id · sourceId · sourceType</text><text x="682" y="348" class="label">assignedTeam · status</text><text x="682" y="370" class="label">notes · imageReport</text><text x="682" y="392" class="label">chemicalsUsed · completedAt</text>
+    <rect x="960" y="145" width="205" height="140" rx="8" class="box"/><text x="977" y="173" class="head">Invoice</text><text x="977" y="198" class="label">PK id · UK invoiceNo</text><text x="977" y="220" class="label">amount · vat · totalAmount</text><text x="977" y="242" class="label">status · receiptDataUrl</text><text x="977" y="264" class="label">paymentReference</text>
+    <rect x="960" y="385" width="205" height="135" rx="8" class="box"/><text x="977" y="413" class="head">Contract</text><text x="977" y="438" class="label">PK id · documentNo</text><text x="977" y="460" class="label">packageName · dates</text><text x="977" y="482" class="label">totalVisits · status</text><text x="977" y="504" class="label">createdBy</text>
+  </g>
+  <g fill="none" stroke="#526273" stroke-width="2">
+    <path d="M162 235 V275"/><path d="M162 380 V425"/>
+    <path d="M270 175 H350"/><path d="M460 230 V275"/><path d="M460 230 V465"/>
+    <path d="M570 340 H665"/><path d="M570 530 H620 V390 H665"/>
+    <path d="M895 315 H930 V215 H960"/><path d="M895 375 H930 V450 H960"/>
+  </g>
+  <g class="small">
+    <text x="178" y="260">username + role</text><text x="178" y="408">teamId</text>
+    <text x="286" y="164">createdBy / packageId</text><text x="475" y="258">packageId</text>
+    <text x="590" y="330">sourceType=problem</text><text x="590" y="520">sourceType=booking</text>
+    <text x="911" y="205">invoiceNo</text><text x="911" y="440">อนุมัติงาน</text>
+  </g>
+  <text x="55" y="665" class="small">PK = Primary Key · UK = Unique Key</text>
+  <text x="55" y="690" class="small">Job อ้าง Problem หรือ Booking ด้วย sourceId และ sourceType; Booking เชื่อมแพ็กเกจด้วย packageId และใบแจ้งหนี้ด้วย invoiceNo</text>
+</svg>
