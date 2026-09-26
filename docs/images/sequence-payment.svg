@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="760" viewBox="0 0 1300 760" role="img" aria-labelledby="title desc">
+  <title id="title">Sequence Diagram การจองและชำระเงิน</title><desc id="desc">ลำดับการสร้าง Booking และ Invoice ส่งสลิป อ่านข้อมูลด้วย OCR และให้ผู้ดูแลยืนยันการชำระ</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3Z" fill="#526273"/></marker><style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:26px;font-weight:700}.head{font-size:15px;font-weight:700}.msg{font-size:12px}.life{stroke:#94a3b2;stroke-width:1.5;stroke-dasharray:6 5}.call{stroke:#526273;stroke-width:2;marker-end:url(#arrow)}.return{stroke:#6c8b7e;stroke-width:1.8;stroke-dasharray:6 4;marker-end:url(#arrow)}</style></defs>
+  <rect width="1300" height="760" fill="#f5f8fa"/><text x="35" y="42" class="title">Sequence Diagram: จองบริการและชำระเงิน</text>
+  <g><rect x="30" y="75" width="150" height="52" rx="8" fill="#e8f4f1" stroke="#5a9e8b"/><rect x="245" y="75" width="160" height="52" rx="8" fill="#e8f2f8" stroke="#5687a7"/><rect x="470" y="75" width="160" height="52" rx="8" fill="#e8f2f8" stroke="#5687a7"/><rect x="695" y="75" width="160" height="52" rx="8" fill="#fff3dc" stroke="#d59d3f"/><rect x="920" y="75" width="150" height="52" rx="8" fill="#edf1f8" stroke="#788db0"/><rect x="1130" y="75" width="150" height="52" rx="8" fill="#f8ece7" stroke="#b56f5c"/></g>
+  <g text-anchor="middle" class="head"><text x="105" y="107">ลูกค้า</text><text x="325" y="107">Customer Portal</text><text x="550" y="107">Express API</text><text x="775" y="107">PostgreSQL</text><text x="995" y="107">ผู้ดูแล</text><text x="1205" y="107">Tesseract OCR</text></g>
+  <g class="life"><path d="M105 127 V720 M325 127 V720 M550 127 V720 M775 127 V720 M995 127 V720 M1205 127 V720"/></g>
+  <g>
+    <path class="call" d="M105 165 H325"/><text x="215" y="158" text-anchor="middle" class="msg">เลือกแพ็กเกจและยืนยันการจอง</text>
+    <path class="call" d="M325 205 H550"/><text x="437" y="198" text-anchor="middle" class="msg">POST /api/bookings</text>
+    <path class="call" d="M550 245 H775"/><text x="662" y="238" text-anchor="middle" class="msg">บันทึก Booking + Invoice</text>
+    <path class="return" d="M550 285 H325"/><text x="437" y="278" text-anchor="middle" class="msg">ส่งข้อมูลการจองและเลขที่บิล</text>
+    <path class="return" d="M325 325 H105"/><text x="215" y="318" text-anchor="middle" class="msg">แสดงยอดและข้อมูลชำระ</text>
+    <path class="call" d="M105 375 H325"/><text x="215" y="368" text-anchor="middle" class="msg">แนบภาพสลิป</text>
+    <path class="call" d="M325 415 H550"/><text x="437" y="408" text-anchor="middle" class="msg">POST /api/receipts/ocr</text>
+    <path class="call" d="M550 455 H1205"/><text x="877" y="448" text-anchor="middle" class="msg">ส่งภาพให้ OCR อ่านข้อความ</text>
+    <path class="return" d="M1205 495 H550"/><text x="877" y="488" text-anchor="middle" class="msg">จำนวนเงิน / ชื่อ / เวลา (ถ้าอ่านได้)</text>
+    <path class="return" d="M550 535 H325"/><text x="437" y="528" text-anchor="middle" class="msg">คืนผล OCR ให้หน้าเว็บ</text>
+    <path class="call" d="M325 575 H550"/><text x="437" y="568" text-anchor="middle" class="msg">POST /api/invoices/:id/receipt</text>
+    <path class="call" d="M550 615 H775"/><text x="662" y="608" text-anchor="middle" class="msg">บันทึกหลักฐานการชำระ</text>
+    <path class="call" d="M995 655 H550"/><text x="772" y="648" text-anchor="middle" class="msg">ผู้ดูแลตรวจและยืนยันสถานะ Invoice</text>
+    <path class="call" d="M550 695 H775"/><text x="662" y="688" text-anchor="middle" class="msg">PATCH สถานะเป็นชำระเงินแล้ว</text>
+  </g>
+</svg>

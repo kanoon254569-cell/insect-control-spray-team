@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+  <title id="title">Use Case Diagram ระบบ NP Place Control</title>
+  <desc id="desc">แผนภาพผู้ใช้งาน ลูกค้า ผู้ดูแล ช่าง และ LINE ที่เชื่อมกับกรณีใช้งานภายในระบบ</desc>
+  <defs><style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:28px;font-weight:700}.actor{font-size:16px;font-weight:700}.uc{font-size:14px}.note{font-size:12px}.line{stroke:#65788a;stroke-width:1.8;fill:none}</style></defs>
+  <rect width="1400" height="820" fill="#f5f8fa"/><text x="42" y="48" class="title">Use Case Diagram: NP Place Control</text>
+  <rect x="300" y="92" width="835" height="675" rx="16" fill="#fff" stroke="#5687a7" stroke-width="3"/><text x="717" y="124" text-anchor="middle" class="actor">ระบบ NP Place Control</text>
+  <g class="line">
+    <path d="M155 205 L390 185 M155 205 L615 185 M155 205 L835 185 M155 205 L1050 185"/>
+    <path d="M155 205 L390 295 M155 205 L615 295 M155 205 L835 295 M155 205 L1050 295"/>
+    <path d="M1240 205 L390 405 M1240 205 L615 405 M1240 205 L835 405 M1240 205 L1050 405"/>
+    <path d="M1240 205 L390 515 M1240 205 L615 515 M1240 205 L835 515 M1240 205 L1050 515"/>
+    <path d="M690 700 L390 625 M690 700 L615 625 M690 700 L835 625"/>
+    <path d="M1240 700 L1050 515 M1240 700 L1050 625"/>
+  </g>
+  <g fill="#f0f6fa" stroke="#5687a7" stroke-width="2">
+    <ellipse cx="390" cy="185" rx="105" ry="34"/><ellipse cx="615" cy="185" rx="105" ry="34"/><ellipse cx="835" cy="185" rx="105" ry="34"/><ellipse cx="1050" cy="185" rx="105" ry="34"/>
+    <ellipse cx="390" cy="295" rx="105" ry="34"/><ellipse cx="615" cy="295" rx="105" ry="34"/><ellipse cx="835" cy="295" rx="105" ry="34"/><ellipse cx="1050" cy="295" rx="105" ry="34"/>
+    <ellipse cx="390" cy="405" rx="105" ry="34"/><ellipse cx="615" cy="405" rx="105" ry="34"/><ellipse cx="835" cy="405" rx="105" ry="34"/><ellipse cx="1050" cy="405" rx="105" ry="34"/>
+    <ellipse cx="390" cy="515" rx="105" ry="34"/><ellipse cx="615" cy="515" rx="105" ry="34"/><ellipse cx="835" cy="515" rx="105" ry="34"/><ellipse cx="1050" cy="515" rx="105" ry="34"/>
+    <ellipse cx="390" cy="625" rx="105" ry="34"/><ellipse cx="615" cy="625" rx="105" ry="34"/><ellipse cx="835" cy="625" rx="105" ry="34"/><ellipse cx="1050" cy="625" rx="105" ry="34"/>
+  </g>
+  <g class="uc" text-anchor="middle">
+    <text x="390" y="190">เข้าสู่ระบบ / สมัครสมาชิก</text><text x="615" y="190">จัดการโปรไฟล์</text><text x="835" y="190">แจ้งปัญหา</text><text x="1050" y="190">ดูแพ็กเกจ / จองบริการ</text>
+    <text x="390" y="300">ส่งหลักฐานชำระเงิน</text><text x="615" y="300">ติดตามงาน / สัญญา</text><text x="835" y="300">จัดการทีม / สมาชิก</text><text x="1050" y="300">จัดการใบแจ้งหนี้</text>
+    <text x="390" y="410">มอบหมายทีม / วันนัด</text><text x="615" y="410">ตรวจรับงาน</text><text x="835" y="410">ดูงานของทีม</text><text x="1050" y="410">อัปเดตสถานะงาน</text>
+    <text x="390" y="520">บันทึกผลการทำงาน</text><text x="615" y="520">แนบรูป / สารเคมี</text><text x="835" y="520">ตรวจสอบการชำระ</text><text x="1050" y="520">รับแจ้งเตือน LINE</text>
+    <text x="390" y="630">จัดการสัญญา</text><text x="615" y="630">ดูรายการบริการ</text><text x="835" y="630">สร้างสัญญาหลังตรวจรับ</text><text x="1050" y="630">ยืนยันตัวตน LINE</text>
+  </g>
+  <g stroke="#263d4f" stroke-width="3" fill="none">
+    <circle cx="155" cy="165" r="18" fill="#fff"/><path d="M155 183 V235 M125 201 H185 M155 235 L128 270 M155 235 L182 270"/>
+    <circle cx="1240" cy="165" r="18" fill="#fff"/><path d="M1240 183 V235 M1210 201 H1270 M1240 235 L1213 270 M1240 235 L1267 270"/>
+    <circle cx="690" cy="655" r="18" fill="#fff"/><path d="M690 673 V725 M660 691 H720 M690 725 L663 760 M690 725 L717 760"/>
+    <circle cx="1240" cy="655" r="18" fill="#fff"/><path d="M1240 673 V725 M1210 691 H1270 M1240 725 L1213 760 M1240 725 L1267 760"/>
+  </g>
+  <g class="actor" text-anchor="middle"><text x="155" y="300">ลูกค้า</text><text x="1240" y="300">ผู้ดูแลระบบ</text><text x="690" y="800">หัวหน้าทีม / ช่าง</text><text x="1240" y="800">LINE</text></g>
+  <text x="320" y="790" class="note">เส้นแสดงการมีส่วนร่วมระหว่าง Actor และ Use Case ภายในขอบเขตระบบ</text>
+</svg>

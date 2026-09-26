@@ -6,6 +6,24 @@
 
 ภาพ SVG ด้านล่างบันทึกอยู่ใน Git และเปิดดูได้โดยตรง ภาพ Mermaid ฉบับละเอียดอยู่ในหัวข้อถัดไป
 
+### Use Case Diagram
+
+![Use Case Diagram ระบบ NP Place Control](images/use-case-diagram.svg)
+
+### Activity Diagram
+
+![Activity Diagram ขั้นตอนการให้บริการ](images/activity-diagram.svg)
+
+### Sequence Diagram
+
+![Sequence Diagram การเข้าสู่ระบบ](images/sequence-login.svg)
+
+![Sequence Diagram การจองและชำระเงิน](images/sequence-payment.svg)
+
+### ER Diagram
+
+![ER Diagram โมเดลข้อมูลระบบ](images/er-diagram.svg)
+
 ### สถาปัตยกรรมระบบ
 
 ![สถาปัตยกรรมระบบ NP Place Control](images/architecture.svg)

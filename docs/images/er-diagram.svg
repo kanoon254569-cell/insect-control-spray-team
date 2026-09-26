@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="850" viewBox="0 0 1500 850" role="img" aria-labelledby="title desc">
+  <title id="title">ER Diagram ระบบ NP Place Control</title>
+  <desc id="desc">Entity 10 ตารางและความสัมพันธ์เชิงตรรกะที่ใช้ใน Prisma schema</desc>
+  <defs><style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:28px;font-weight:700}.entity{font-size:17px;font-weight:700}.field{font-size:12px}.note{font-size:12px}.card{fill:#fff;stroke:#7890a3;stroke-width:2}.rel{stroke:#526273;stroke-width:2;fill:none}.rl{font-size:11px;font-weight:700}</style></defs>
+  <rect width="1500" height="850" fill="#f5f8fa"/><text x="40" y="48" class="title">ER Diagram: โมเดลข้อมูลระบบ</text><text x="40" y="76" class="note">แสดง entity และคีย์ที่ใช้เชื่อมข้อมูล; ความสัมพันธ์เป็นเชิงตรรกะหาก schema ไม่ได้กำหนด foreign key</text>
+  <g class="rel">
+    <path d="M380 175 H410"/><path d="M1030 175 H1060"/>
+    <path d="M215 240 V270 H575 V300"/><path d="M380 405 H395 V275 H935 V300"/>
+    <path d="M575 460 V480 H1290 V300"/><path d="M1100 375 H1130"/><path d="M935 460 V560"/>
+  </g>
+  <g class="rl"><text x="382" y="163">username + role</text><text x="1034" y="163">teamId</text><text x="390" y="292">packageId</text><text x="800" y="493">sourceId + sourceType</text><text x="1102" y="363">sourceId + sourceType</text><text x="946" y="510">invoiceNo</text></g>
+  <g>
+    <g><rect x="50" y="115" width="330" height="125" rx="8" class="card"/><text x="70" y="143" class="entity">User</text><text x="70" y="169" class="field">PK id · username · role</text><text x="70" y="191" class="field">passwordHash · displayName</text><text x="70" y="213" class="field">phone · address · createdAt</text></g>
+    <g><rect x="410" y="115" width="240" height="125" rx="8" class="card"/><text x="430" y="143" class="entity">Session</text><text x="430" y="169" class="field">PK sessionId · username</text><text x="430" y="191" class="field">role · expiresAt</text><text x="430" y="213" class="field">teamId · teamName</text></g>
+    <g><rect x="700" y="115" width="330" height="125" rx="8" class="card"/><text x="720" y="143" class="entity">Team</text><text x="720" y="169" class="field">PK id · UK name</text><text x="720" y="191" class="field">description · createdAt</text><text x="720" y="213" class="field">ทีมช่าง</text></g>
+    <g><rect x="1060" y="115" width="390" height="125" rx="8" class="card"/><text x="1080" y="143" class="entity">TeamMember</text><text x="1080" y="169" class="field">PK id · UK username · name</text><text x="1080" y="191" class="field">phone · email · role · teamId</text><text x="1080" y="213" class="field">teamName · status</text></g>
+
+    <g><rect x="50" y="300" width="330" height="160" rx="8" class="card"/><text x="70" y="328" class="entity">ServicePackage</text><text x="70" y="354" class="field">PK id · name · price</text><text x="70" y="376" class="field">duration · description</text><text x="70" y="398" class="field">guarantee · features (JSON)</text></g>
+    <g><rect x="410" y="300" width="330" height="160" rx="8" class="card"/><text x="430" y="328" class="entity">PestProblem</text><text x="430" y="354" class="field">PK id · customerName · customerPhone</text><text x="430" y="376" class="field">pestType · urgency · status</text><text x="430" y="398" class="field">createdBy · assignedTeam</text><text x="430" y="420" class="field">appointmentDate</text></g>
+    <g><rect x="770" y="300" width="330" height="160" rx="8" class="card"/><text x="790" y="328" class="entity">Booking</text><text x="790" y="354" class="field">PK id · packageId · packageName</text><text x="790" y="376" class="field">customer · bookingDate · price</text><text x="790" y="398" class="field">status · invoiceNo · createdBy</text></g>
+    <g><rect x="1130" y="300" width="320" height="160" rx="8" class="card"/><text x="1150" y="328" class="entity">Job</text><text x="1150" y="354" class="field">PK id · sourceId · sourceType</text><text x="1150" y="376" class="field">assignedTeam · appointmentDate</text><text x="1150" y="398" class="field">status · notesByTech · imageReport</text><text x="1150" y="420" class="field">chemicalsUsed · completedAt</text></g>
+
+    <g><rect x="770" y="560" width="330" height="145" rx="8" class="card"/><text x="790" y="588" class="entity">Invoice</text><text x="790" y="614" class="field">PK id · UK invoiceNo</text><text x="790" y="636" class="field">amount · vat · totalAmount · status</text><text x="790" y="658" class="field">dueDate · receiptDataUrl</text><text x="790" y="680" class="field">payerName · paymentReference</text></g>
+    <g><rect x="1130" y="560" width="320" height="145" rx="8" class="card"/><text x="1150" y="588" class="entity">Contract</text><text x="1150" y="614" class="field">PK id · documentNo · packageName</text><text x="1150" y="636" class="field">startDate · endDate · price</text><text x="1150" y="658" class="field">totalVisits · completedVisits · status</text><text x="1150" y="680" class="field">createdBy · no jobId / packageId</text></g>
+  </g>
+  <text x="50" y="755" class="note">User.createdBy อ้าง username; Job เชื่อม Problem หรือ Booking ด้วย sourceId/sourceType; Booking เชื่อม Package และ Invoice ด้วย packageId/invoiceNo</text>
+  <text x="50" y="780" class="note">Contract ถูกสร้างเมื่อผู้ดูแลอนุมัติงาน แต่ไม่มี foreign key ไปยัง Job ใน Prisma schema · PK = Primary Key · UK = Unique Key</text>
+</svg>

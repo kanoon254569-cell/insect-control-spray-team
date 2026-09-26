@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="900" viewBox="0 0 1500 900" role="img" aria-labelledby="title desc">
+  <title id="title">Activity Diagram ขั้นตอนการให้บริการ</title>
+  <desc id="desc">กิจกรรมตาม swimlane ลูกค้า ระบบ ผู้ดูแล และทีมช่าง ตั้งแต่ส่งคำขอจนตรวจรับ</desc>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0 L0 6 L9 3Z" fill="#526273"/></marker><style>text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:28px;font-weight:700}.lane{font-size:18px;font-weight:700}.label{font-size:14px}.small{font-size:12px}.edge{stroke:#526273;stroke-width:2.2;fill:none;marker-end:url(#arrow)}</style></defs>
+  <rect width="1500" height="900" fill="#f5f8fa"/><text x="40" y="48" class="title">Activity Diagram: ขั้นตอนการให้บริการ</text>
+  <rect x="30" y="80" width="350" height="770" fill="#fff" stroke="#cbd5df"/><rect x="380" y="80" width="380" height="770" fill="#f8fbfd" stroke="#cbd5df"/><rect x="760" y="80" width="350" height="770" fill="#fff" stroke="#cbd5df"/><rect x="1110" y="80" width="360" height="770" fill="#f8fbfd" stroke="#cbd5df"/>
+  <text x="205" y="115" text-anchor="middle" class="lane">ลูกค้า</text><text x="570" y="115" text-anchor="middle" class="lane">ระบบ</text><text x="935" y="115" text-anchor="middle" class="lane">ผู้ดูแล</text><text x="1290" y="115" text-anchor="middle" class="lane">ทีมช่าง</text>
+  <g class="edge">
+    <path d="M205 170 V200"/><path d="M205 255 V285"/><path d="M315 312 H430 V230 H500"/><path d="M205 380 V340"/>
+    <path d="M640 230 H700 V407 H315"/><path d="M570 260 V380"/><path d="M570 435 V480"/>
+    <path d="M650 510 H820"/><path d="M935 540 V575"/><path d="M820 605 H685"/><path d="M570 635 V650 H1290 V635"/>
+    <path d="M1290 635 V670"/><path d="M1175 697 H1050"/><path d="M820 727 H685"/><path d="M570 755 V790"/>
+  </g>
+  <circle cx="205" cy="155" r="12" fill="#172b3a"/><text x="230" y="160" class="small">เริ่ม</text>
+  <g fill="#e8f4f1" stroke="#5a9e8b" stroke-width="2"><rect x="95" y="200" width="220" height="55" rx="15"/><rect x="95" y="285" width="220" height="55" rx="15"/><rect x="95" y="380" width="220" height="55" rx="15"/></g>
+  <text x="205" y="233" text-anchor="middle" class="label">เลือกแจ้งปัญหาหรือจองบริการ</text><text x="205" y="318" text-anchor="middle" class="label">กรอกข้อมูลคำขอ</text><text x="205" y="413" text-anchor="middle" class="label">แก้ข้อมูลให้ครบ</text>
+  <polygon points="570,200 640,230 570,260 500,230" fill="#fff3dc" stroke="#d59d3f" stroke-width="2"/><text x="570" y="235" text-anchor="middle" class="small">ข้อมูลครบ?</text>
+  <text x="658" y="298" class="small">ไม่ครบ</text><text x="585" y="365" class="small">ครบ</text>
+  <g fill="#e8f2f8" stroke="#5687a7" stroke-width="2"><rect x="455" y="380" width="230" height="55" rx="15"/><rect x="455" y="480" width="230" height="60" rx="15"/><rect x="455" y="575" width="230" height="60" rx="15"/></g>
+  <text x="570" y="405" text-anchor="middle" class="label">บันทึก Problem หรือ Booking</text><text x="570" y="425" text-anchor="middle" class="small">สร้าง Invoice เมื่อเป็นการจอง</text><text x="570" y="505" text-anchor="middle" class="label">แจ้งผู้เกี่ยวข้องผ่าน LINE</text><text x="570" y="529" text-anchor="middle" class="small">เมื่อมีการตั้งค่าการแจ้งเตือน</text><text x="570" y="600" text-anchor="middle" class="label">สร้าง Job และผูกคำขอต้นทาง</text>
+  <g fill="#fff3dc" stroke="#d59d3f" stroke-width="2"><rect x="820" y="480" width="230" height="60" rx="15"/><rect x="820" y="575" width="230" height="60" rx="15"/><rect x="820" y="700" width="230" height="55" rx="15"/></g>
+  <text x="935" y="505" text-anchor="middle" class="label">ตรวจคำขอ</text><text x="935" y="529" text-anchor="middle" class="small">เลือกทีมและวันนัดหมาย</text><text x="935" y="600" text-anchor="middle" class="label">ยืนยันการมอบหมายงาน</text><text x="935" y="725" text-anchor="middle" class="label">ตรวจรับงาน</text>
+  <g fill="#edf1f8" stroke="#788db0" stroke-width="2"><rect x="1175" y="575" width="230" height="60" rx="15"/><rect x="1175" y="670" width="230" height="55" rx="15"/></g>
+  <text x="1290" y="600" text-anchor="middle" class="label">รับงานที่ได้รับมอบหมาย</text><text x="1290" y="624" text-anchor="middle" class="small">เริ่มเตรียมตัวและเดินทาง</text><text x="1290" y="703" text-anchor="middle" class="label">ทำงานและส่งรายงาน</text>
+  <rect x="455" y="700" width="230" height="55" rx="15" fill="#e8f2f8" stroke="#5687a7" stroke-width="2"/><text x="570" y="725" text-anchor="middle" class="label">อัปเดตสถานะและสร้าง Contract</text><text x="570" y="744" text-anchor="middle" class="small">ปิดคำขอต้นทาง</text>
+  <circle cx="570" cy="805" r="14" fill="#fff" stroke="#172b3a" stroke-width="3"/><circle cx="570" cy="805" r="9" fill="#172b3a"/><text x="595" y="810" class="small">จบ</text>
+  <text x="35" y="875" class="small">การส่งสลิปและตรวจสอบการชำระเงินเป็นกิจกรรมแยกจากการสร้าง Job ดู Sequence Diagram ประกอบ</text>
+</svg>
