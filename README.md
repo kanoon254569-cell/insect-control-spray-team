@@ -4,6 +4,8 @@
 
 # Run and deploy your AI Studio app
 
+ดูไดอะแกรมระบบและขั้นตอนการทำงานได้ที่ [docs/diagrams.md](docs/diagrams.md)
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/fc2485e0-cd12-461d-8400-89337797bdeb
