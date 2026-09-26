@@ -8,21 +8,21 @@
 
 ### Use Case Diagram
 
-![Use Case Diagram ระบบ NP Place Control](images/use-case-diagram.svg)
+![Use Case Diagram ระบบ NP Place Control](images/use-case-diagram.png)
 
 ### Activity Diagram
 
-![Activity Diagram ขั้นตอนการให้บริการ](images/activity-diagram.svg)
+![Activity Diagram ขั้นตอนการให้บริการ](images/activity-diagram.png)
 
 ### Sequence Diagram
 
-![Sequence Diagram การเข้าสู่ระบบ](images/sequence-login.svg)
+![Sequence Diagram การเข้าสู่ระบบ](images/sequence-login.png)
 
-![Sequence Diagram การจองและชำระเงิน](images/sequence-payment.svg)
+![Sequence Diagram การจองและชำระเงิน](images/sequence-payment.png)
 
 ### ER Diagram
 
-![ER Diagram โมเดลข้อมูลระบบ](images/er-diagram.svg)
+![ER Diagram โมเดลข้อมูลระบบ](images/er-diagram.png)
 
 ### สถาปัตยกรรมระบบ
 
