@@ -36,7 +36,104 @@ flowchart LR
   Technician -.->|แจ้งเตือนการเข้าสู่ระบบ| LINE
 ```
 
-## 2. สถาปัตยกรรมส่วนประกอบ
+## 2. Use Case Diagram
+
+แสดงขอบเขตการใช้งานตามบทบาท ลูกค้า ผู้ดูแล ช่าง และบริการ LINE
+
+```mermaid
+flowchart LR
+  Customer["«actor» ลูกค้า"]
+  Admin["«actor» ผู้ดูแลระบบ"]
+  Technician["«actor» หัวหน้าทีม / ช่าง"]
+  LINE["«actor» LINE Platform"]
+
+  subgraph System[ระบบ NP Place Control]
+    Login((เข้าสู่ระบบ / สมัครสมาชิก))
+    Profile((จัดการโปรไฟล์))
+    Report((แจ้งปัญหา))
+    Catalog((ดูแพ็กเกจและจองบริการ))
+    Payment((ส่งหลักฐานและติดตามการชำระเงิน))
+    Tracking((ติดตามงานและสัญญา))
+    TeamAdmin((จัดการทีมและสมาชิก))
+    Dispatch((มอบหมายทีมและวันนัด))
+    Billing((จัดการใบแจ้งหนี้))
+    Work((ดูงานและอัปเดตสถานะ))
+    WorkReport((บันทึกผล รูปภาพ และสารเคมี))
+    Approve((ตรวจรับงานและสร้างสัญญา))
+  end
+
+  Customer --- Login
+  Customer --- Profile
+  Customer --- Report
+  Customer --- Catalog
+  Customer --- Payment
+  Customer --- Tracking
+  Admin --- Login
+  Admin --- TeamAdmin
+  Admin --- Dispatch
+  Admin --- Billing
+  Admin --- Approve
+  Technician --- Login
+  Technician --- Work
+  Technician --- WorkReport
+  LINE --- Login
+  LINE --- Payment
+  LINE --- Tracking
+```
+
+## 3. Activity Diagram
+
+แสดงกิจกรรมตั้งแต่ส่งคำขอบริการจนสร้างงานให้ทีมช่างและตรวจรับ โดยคำขอเป็นได้ทั้งแจ้งปัญหาหรือการจองแพ็กเกจ
+
+```mermaid
+flowchart TD
+  Start((เริ่ม)) --> Choose{เลือกบริการ}
+
+  subgraph CustomerLane[ลูกค้า]
+    Choose -->|แจ้งปัญหา| ProblemForm[กรอกรายละเอียดปัญหา]
+    Choose -->|จองบริการ| BookingForm[เลือกแพ็กเกจและกรอกข้อมูลนัดหมาย]
+    ProblemForm --> Submit[ส่งคำขอ]
+    BookingForm --> Submit
+    Fix[แก้ข้อมูลให้ครบ]
+  end
+
+  subgraph SystemLane[ระบบ]
+    Submit --> Validate{ข้อมูลครบหรือไม่}
+    Validate -->|ครบ: แจ้งปัญหา| SaveProblem[บันทึก PestProblem]
+    Validate -->|ครบ: จองบริการ| SaveBooking[บันทึก Booking และสร้าง Invoice]
+    Validate -->|ไม่ครบ| Fix
+    SaveProblem --> Notify[แจ้งผู้เกี่ยวข้องผ่าน LINE ตามการตั้งค่า]
+    SaveBooking --> Notify
+    CreateJob[สร้าง Job และเชื่อมกับคำขอต้นทาง]
+    Finish[อัปเดตคำขอและสร้าง Contract]
+  end
+
+  subgraph AdminLane[ผู้ดูแลระบบ]
+    Review[ตรวจคำขอ]
+    Assign[เลือกทีมและวันนัด]
+    Accept[ตรวจรับงาน]
+  end
+
+  subgraph TechnicianLane[ทีมช่าง]
+    UpdateStatus[อัปเดตสถานะงาน]
+    SubmitReport[บันทึกผลและส่งงาน]
+  end
+
+  Fix --> ProblemForm
+  Fix --> BookingForm
+  Notify --> Review
+  Review --> Assign
+  Assign --> CreateJob
+  CreateJob --> UpdateStatus
+  UpdateStatus --> SubmitReport
+  SubmitReport --> Accept
+  Accept --> Finish
+  Finish --> End((จบ))
+```
+
+หมายเหตุ: ใบแจ้งหนี้ถูกสร้างพร้อมการจอง ส่วนการส่งสลิปและการตรวจสอบการชำระเงินเป็นขั้นตอนแยกตาม Sequence Diagram ด้านล่าง
+
+## 4. สถาปัตยกรรมส่วนประกอบ
 
 ```mermaid
 flowchart TB
@@ -76,7 +173,7 @@ flowchart TB
   Backend --> Prisma
 ```
 
-## 3. การติดตั้งและการให้บริการ
+## 5. การติดตั้งและการให้บริการ
 
 ```mermaid
 flowchart LR
@@ -100,7 +197,7 @@ flowchart LR
 
 ในโหมด production คำสั่ง `npm start` deploy Prisma migrations แล้วเริ่ม Express; Express จะเสิร์ฟไฟล์จาก `dist/` หากมีอยู่ ส่วนการพัฒนาใช้ Vite และ API บนพอร์ตที่กำหนดด้วย `PORT` (ค่าเริ่มต้น 8787)
 
-## 4. แผนภาพข้อมูล (ERD)
+## 6. ER Diagram (ERD)
 
 ```mermaid
 erDiagram
@@ -225,7 +322,7 @@ erDiagram
 
 `SESSION` เก็บข้อมูลทีม ณ เวลาสร้าง session; `JOB.sourceId` อ้างได้ทั้ง `PEST_PROBLEM.id` หรือ `BOOKING.id` โดยแยกด้วย `sourceType` ระบบไม่ได้ประกาศ foreign key สำหรับความสัมพันธ์เหล่านี้ ส่วน `CONTRACT` เก็บชื่อแพ็กเกจเป็นข้อความ ไม่มี `packageId`
 
-## 5. ขั้นตอนแจ้งปัญหาและมอบหมายช่าง
+## 7. ขั้นตอนแจ้งปัญหาและมอบหมายช่าง
 
 ```mermaid
 flowchart TD
@@ -245,7 +342,7 @@ flowchart TD
   Review --> Contract[ระบบสร้างสัญญาบริการ/รับประกัน]
 ```
 
-## 6. ขั้นตอนจองบริการและชำระเงิน
+## 8. Sequence Diagram: จองบริการและชำระเงิน
 
 ```mermaid
 sequenceDiagram
@@ -275,7 +372,7 @@ sequenceDiagram
 
 การอ่านข้อความด้วย OCR ช่วยดึงข้อมูลจากภาพ แต่สถานะชำระเงินสามารถเปลี่ยนได้ผ่านการอัปเดตโดยผู้ดูแล; การมีภาพหรือข้อความ OCR เพียงอย่างเดียวไม่ได้ยืนยันการชำระเงิน
 
-## 7. วงจรสถานะงานช่าง
+## 9. วงจรสถานะงานช่าง
 
 ```mermaid
 stateDiagram-v2
@@ -294,7 +391,7 @@ stateDiagram-v2
 
 เมื่ออนุมัติงาน ระบบสร้าง `Contract` และแจ้งลูกค้าผ่าน LINE ตามการตั้งค่า; สถานะของ Problem หรือ Booking ต้นทางจะถูกปรับตามสถานะงานในบางขั้นตอน
 
-## 8. แผนภาพการเข้าสู่ระบบ
+## 10. Sequence Diagram: เข้าสู่ระบบ
 
 ```mermaid
 sequenceDiagram
@@ -327,7 +424,7 @@ sequenceDiagram
   API-->>UI: ส่งข้อมูลที่กรองแล้ว
 ```
 
-## 9. บทบาทและขอบเขตการเห็นข้อมูล
+## 11. บทบาทและขอบเขตการเห็นข้อมูล
 
 ```mermaid
 flowchart TD
@@ -342,7 +439,7 @@ flowchart TD
 
 สมาชิกทีมถูกจำกัดรายการ Job ตามชื่อทีม ส่วนข้อมูลรายการอื่นใน response ยังคงถูกส่งตามการทำงานใน `GET /api/state`; ลูกค้าถูกกรองปัญหา การจอง สัญญา และใบแจ้งหนี้ตาม `createdBy` หรือชื่อที่แสดง
 
-## 10. กลุ่ม API ตามหน้าที่
+## 12. กลุ่ม API ตามหน้าที่
 
 | กลุ่ม | Endpoint หลัก |
 | --- | --- |
