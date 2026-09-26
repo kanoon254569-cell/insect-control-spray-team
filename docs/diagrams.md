@@ -457,15 +457,33 @@ flowchart TD
 
 สมาชิกทีมถูกจำกัดรายการ Job ตามชื่อทีม ส่วนข้อมูลรายการอื่นใน response ยังคงถูกส่งตามการทำงานใน `GET /api/state`; ลูกค้าถูกกรองปัญหา การจอง สัญญา และใบแจ้งหนี้ตาม `createdBy` หรือชื่อที่แสดง
 
-## 12. กลุ่ม API ตามหน้าที่
+## 12. REST API
 
-| กลุ่ม | Endpoint หลัก |
-| --- | --- |
-| สุขภาพ/การตั้งค่า | `GET /api/health`, `GET /api/config` |
-| ยืนยันตัวตน | `GET /api/me`, `POST /api/login`, `POST /api/register`, `POST /api/logout`, `GET /api/auth/line/start`, `GET /api/auth/line/callback` |
-| ข้อมูลและโปรไฟล์ | `GET /api/state`, `GET/PATCH /api/profile` |
-| ปัญหาและการจอง | `POST /api/problems`, `POST /api/bookings` |
-| งานช่าง | `POST /api/jobs/assign`, `PATCH /api/jobs/:jobId/status`, `POST /api/jobs/:jobId/approve` |
-| ใบแจ้งหนี้/สลิป | `POST /api/invoices`, `PATCH /api/invoices/:invoiceId/status`, `POST /api/receipts/ocr`, `POST /api/invoices/:invoiceId/receipt` |
-| ทีมและสมาชิก | `GET/POST /api/teams`, `PATCH /api/teams/:teamId`, `GET/POST /api/team-members`, `PATCH/DELETE /api/team-members/:memberId` |
-| สัญญา/ข้อมูลตั้งต้น | `PATCH/DELETE /api/contracts/:contractId`, `POST /api/reload` |
+| Method | Endpoint | หน้าที่ |
+| --- | --- | --- |
+| `GET` | `/api/health` | ตรวจสอบสถานะ API |
+| `GET` | `/api/config` | อ่านค่าการสมัครสมาชิกและ LINE Login ที่เปิดใช้ |
+| `GET` | `/api/me` | อ่าน session ปัจจุบัน |
+| `POST` | `/api/login` | เข้าสู่ระบบด้วย username และ password |
+| `POST` | `/api/register` | สมัครบัญชีผู้ใช้ |
+| `POST` | `/api/logout` | ออกจากระบบและลบ session |
+| `GET` | `/api/auth/line/start` | เริ่ม LINE Login |
+| `GET` | `/api/auth/line/callback` | รับผลกลับจาก LINE Login |
+| `GET` | `/api/state` | โหลดข้อมูลระบบตามบทบาทผู้ใช้ |
+| `GET` | `/api/profile` | อ่านโปรไฟล์ |
+| `PATCH` | `/api/profile` | แก้ไขโปรไฟล์ |
+| `POST` | `/api/problems` | สร้างรายการแจ้งปัญหา |
+| `POST` | `/api/bookings` | สร้างการจองและใบแจ้งหนี้ |
+| `POST` | `/api/receipts/ocr` | อ่านข้อมูลจากภาพสลิปด้วย OCR |
+| `POST` | `/api/invoices/:invoiceId/receipt` | แนบหลักฐานการชำระเงิน |
+| `POST` | `/api/invoices` | สร้างใบแจ้งหนี้ |
+| `PATCH` | `/api/invoices/:invoiceId/status` | เปลี่ยนสถานะใบแจ้งหนี้ |
+| `POST` | `/api/jobs/assign` | สร้างและมอบหมายงานให้ทีม |
+| `PATCH` | `/api/jobs/:jobId/status` | อัปเดตสถานะและรายงานงานช่าง |
+| `POST` | `/api/jobs/:jobId/approve` | ตรวจรับงานและสร้างสัญญา |
+| `GET` / `POST` | `/api/teams` | อ่านรายการทีมหรือสร้างทีม |
+| `PATCH` | `/api/teams/:teamId` | แก้ไขข้อมูลทีม |
+| `GET` / `POST` | `/api/team-members` | อ่านรายการสมาชิกหรือเพิ่มสมาชิกทีม |
+| `PATCH` / `DELETE` | `/api/team-members/:memberId` | แก้ไขหรือลบสมาชิกทีม |
+| `PATCH` / `DELETE` | `/api/contracts/:contractId` | แก้ไขหรือลบสัญญา |
+| `POST` | `/api/reload` | โหลดข้อมูลตั้งต้นใหม่ |
