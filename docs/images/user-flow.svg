@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1120" viewBox="0 0 1600 1120" role="img" aria-labelledby="title desc">
+  <title id="title">User Flow ระบบ NP Place Control</title>
+  <desc id="desc">แผนภาพเส้นทางการใช้งานของลูกค้า ผู้ดูแลระบบ และทีมช่าง ตั้งแต่เข้าสู่ระบบจนติดตามและปิดงาน</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#526273"/></marker>
+    <style>
+      text{font-family:Arial,'Noto Sans Thai',sans-serif;fill:#172b3a}.title{font-size:30px;font-weight:700}.section{font-size:19px;font-weight:700}.head{font-size:16px;font-weight:700}.label{font-size:14px}.small{font-size:12px}.node{stroke-width:2}.edge{fill:none;stroke:#526273;stroke-width:2.5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1600" height="1120" fill="#f5f8fa"/>
+  <text x="48" y="54" class="title">User Flow | ระบบ NP Place Control</text>
+  <text x="48" y="84" class="label">เส้นทางหลักของลูกค้า ผู้ดูแลระบบ และทีมช่าง อ้างอิงหน้าจอและการทำงานในระบบปัจจุบัน</text>
+
+  <rect x="48" y="112" width="1504" height="170" rx="10" fill="#ffffff" stroke="#cbd5df"/>
+  <text x="72" y="145" class="section">เริ่มต้นและเข้าสู่ระบบ</text>
+  <rect x="90" y="178" width="190" height="66" rx="8" fill="#e8f2f8" stroke="#5687a7" class="node"/>
+  <text x="185" y="207" text-anchor="middle" class="head">เปิดระบบ</text><text x="185" y="229" text-anchor="middle" class="small">/login</text>
+  <rect x="365" y="178" width="220" height="66" rx="8" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+  <text x="475" y="207" text-anchor="middle" class="head">เข้าสู่ระบบ</text><text x="475" y="229" text-anchor="middle" class="small">บัญชี / LINE (ถ้าเปิดใช้)</text>
+  <rect x="365" y="118" width="220" height="44" rx="8" fill="#f1f4f6" stroke="#9aa9b5" class="node"/>
+  <text x="475" y="146" text-anchor="middle" class="label">สมัครบัญชี (ถ้าเปิดรับสมัคร)</text>
+  <polygon points="700,178 760,211 700,244 640,211" fill="#fff" stroke="#788db0" class="node"/>
+  <text x="700" y="216" text-anchor="middle" class="small">บทบาท?</text>
+  <path d="M280 211 H365 M585 211 H640 M475 162 V178" class="edge"/>
+  <path d="M760 211 H840 V174 H900 M840 211 V228 H900 M840 228 V260 H900" class="edge"/>
+  <text x="854" y="165" class="small">ลูกค้า</text><text x="854" y="220" class="small">ผู้ดูแล</text><text x="854" y="257" class="small">ช่าง</text>
+  <rect x="900" y="143" width="230" height="58" rx="8" fill="#e8f4f1" stroke="#5a9e8b" class="node"/>
+  <text x="1015" y="179" text-anchor="middle" class="head">พอร์ทัลลูกค้า</text>
+  <rect x="900" y="210" width="230" height="58" rx="8" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+  <text x="1015" y="246" text-anchor="middle" class="head">พอร์ทัลผู้ดูแล</text>
+  <rect x="1175" y="210" width="230" height="58" rx="8" fill="#edf1f8" stroke="#788db0" class="node"/>
+  <text x="1290" y="246" text-anchor="middle" class="head">พอร์ทัลทีมช่าง</text>
+  <path d="M1130 239 H1175" class="edge"/>
+
+  <rect x="48" y="310" width="470" height="730" rx="10" fill="#e8f4f1" stroke="#9cc7bb"/>
+  <text x="72" y="347" class="section">ลูกค้า</text>
+  <rect x="112" y="372" width="340" height="58" rx="8" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="282" y="408" text-anchor="middle" class="head">เลือกเมนูในพอร์ทัล</text>
+  <path d="M282 430 V456" class="edge"/>
+  <polygon points="282,456 365,500 282,544 199,500" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="282" y="496" text-anchor="middle" class="label">ต้องการทำอะไร?</text><text x="282" y="516" text-anchor="middle" class="small">จอง / แจ้งปัญหา / ติดตาม</text>
+  <path d="M199 500 H95 V572" class="edge"/><text x="110" y="490" class="small">จอง</text>
+  <path d="M282 544 V572" class="edge"/><text x="294" y="561" class="small">แจ้งปัญหา</text>
+  <path d="M365 500 H470 V850 H452" class="edge"/><text x="384" y="490" class="small">ติดตาม / ชำระ</text>
+  <rect x="72" y="572" width="200" height="74" rx="8" fill="#fff" stroke="#5687a7" class="node"/>
+  <text x="172" y="601" text-anchor="middle" class="head">เลือกแพ็กเกจ</text><text x="172" y="624" text-anchor="middle" class="small">กรอกข้อมูลนัดหมาย</text>
+  <rect x="292" y="572" width="200" height="74" rx="8" fill="#fff" stroke="#5687a7" class="node"/>
+  <text x="392" y="601" text-anchor="middle" class="head">กรอกรายละเอียด</text><text x="392" y="624" text-anchor="middle" class="small">ปัญหาและข้อมูลติดต่อ</text>
+  <path d="M172 646 V678 H282 M392 646 V678 H282 V694" class="edge"/>
+  <rect x="112" y="694" width="340" height="66" rx="8" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="282" y="723" text-anchor="middle" class="head">ส่งคำขอ</text><text x="282" y="745" text-anchor="middle" class="small">จอง: สร้าง Booking + Invoice</text>
+  <path d="M282 760 V788" class="edge"/>
+  <rect x="112" y="788" width="340" height="62" rx="8" fill="#fff" stroke="#d59d3f" class="node"/>
+  <text x="282" y="815" text-anchor="middle" class="head">รอผู้ดูแลจัดคิวและมอบหมายช่าง</text><text x="282" y="836" text-anchor="middle" class="small">ติดตามความคืบหน้าในระบบ</text>
+  <path d="M282 850 V878" class="edge"/>
+  <rect x="112" y="878" width="340" height="62" rx="8" fill="#fff" stroke="#788db0" class="node"/>
+  <text x="282" y="905" text-anchor="middle" class="head">ดูสถานะงานและรายงานช่าง</text><text x="282" y="926" text-anchor="middle" class="small">ส่งหลักฐานชำระเงิน / ดูใบแจ้งหนี้</text>
+  <path d="M282 940 V968" class="edge"/>
+  <rect x="112" y="968" width="340" height="52" rx="8" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="282" y="1001" text-anchor="middle" class="head">ดูสัญญาบริการ (เมื่อมี)</text>
+
+  <rect x="565" y="310" width="470" height="730" rx="10" fill="#fff3dc" stroke="#e3c17e"/>
+  <text x="589" y="347" class="section">ผู้ดูแลระบบ</text>
+  <rect x="630" y="382" width="340" height="65" rx="8" fill="#fff" stroke="#d59d3f" class="node"/>
+  <text x="800" y="410" text-anchor="middle" class="head">ตรวจคำขอและการชำระเงิน</text><text x="800" y="432" text-anchor="middle" class="small">แจ้งปัญหา / จอง / Invoice / สลิป</text>
+  <path d="M800 447 V482" class="edge"/>
+  <rect x="630" y="482" width="340" height="65" rx="8" fill="#fff" stroke="#d59d3f" class="node"/>
+  <text x="800" y="510" text-anchor="middle" class="head">กำหนดวันนัดและเลือกทีม</text><text x="800" y="532" text-anchor="middle" class="small">สร้างและมอบหมาย Job</text>
+  <path d="M800 547 V582" class="edge"/>
+  <rect x="630" y="582" width="340" height="65" rx="8" fill="#fff" stroke="#788db0" class="node"/>
+  <text x="800" y="610" text-anchor="middle" class="head">ติดตามงานที่ช่างส่งกลับ</text><text x="800" y="632" text-anchor="middle" class="small">จัดการทีม ใบแจ้งหนี้ และสัญญา</text>
+  <path d="M800 647 V682" class="edge"/>
+  <polygon points="800,682 895,728 800,774 705,728" fill="#fff" stroke="#d59d3f" class="node"/>
+  <text x="800" y="724" text-anchor="middle" class="label">ตรวจรับงาน</text><text x="800" y="744" text-anchor="middle" class="small">ผ่านหรือให้แก้ไข</text>
+  <path d="M705 728 H655 V810" class="edge"/><text x="659" y="718" class="small">แก้ไข</text>
+  <path d="M800 774 V810" class="edge"/><text x="812" y="797" class="small">ผ่าน</text>
+  <rect x="630" y="810" width="340" height="72" rx="8" fill="#fff" stroke="#5a9e8b" class="node"/>
+  <text x="800" y="840" text-anchor="middle" class="head">ปิดงานและสร้างสัญญา</text><text x="800" y="863" text-anchor="middle" class="small">แจ้งลูกค้าตามการตั้งค่า LINE</text>
+  <rect x="630" y="925" width="340" height="65" rx="8" fill="#fff" stroke="#9aa9b5" class="node"/>
+  <text x="800" y="953" text-anchor="middle" class="head">จัดการข้อมูลระบบ</text><text x="800" y="975" text-anchor="middle" class="small">ทีม / สมาชิก / ใบแจ้งหนี้ / สัญญา</text>
+
+  <rect x="1082" y="310" width="470" height="730" rx="10" fill="#edf1f8" stroke="#b1bdd0"/>
+  <text x="1106" y="347" class="section">ทีมช่าง / หัวหน้าทีม</text>
+  <rect x="1150" y="382" width="340" height="65" rx="8" fill="#fff" stroke="#788db0" class="node"/>
+  <text x="1320" y="410" text-anchor="middle" class="head">ดูงานที่มอบหมายให้ทีม</text><text x="1320" y="432" text-anchor="middle" class="small">รายละเอียด สถานที่ และกำหนดนัด</text>
+  <path d="M1320 447 V482" class="edge"/>
+  <rect x="1150" y="482" width="340" height="65" rx="8" fill="#fff" stroke="#788db0" class="node"/>
+  <text x="1320" y="510" text-anchor="middle" class="head">อัปเดตสถานะงาน</text><text x="1320" y="532" text-anchor="middle" class="small">เตรียมตัว → เดินทาง → เริ่มงาน</text>
+  <path d="M1320 547 V582" class="edge"/>
+  <rect x="1150" y="582" width="340" height="76" rx="8" fill="#fff" stroke="#5687a7" class="node"/>
+  <text x="1320" y="612" text-anchor="middle" class="head">บันทึกผลการปฏิบัติงาน</text><text x="1320" y="635" text-anchor="middle" class="small">รายงาน รูปภาพ และสารเคมี</text>
+  <path d="M1320 658 V693" class="edge"/>
+  <rect x="1150" y="693" width="340" height="72" rx="8" fill="#fff3dc" stroke="#d59d3f" class="node"/>
+  <text x="1320" y="723" text-anchor="middle" class="head">ส่งงานให้ผู้ดูแลตรวจรับ</text><text x="1320" y="746" text-anchor="middle" class="small">ผู้ดูแลอาจส่งกลับให้แก้ไข</text>
+  <path d="M1150 729 H1070 V728 H895" class="edge"/>
+  <text x="1105" y="716" class="small">รายงานงาน</text>
+  <rect x="1150" y="825" width="340" height="75" rx="8" fill="#fff" stroke="#9aa9b5" class="node"/>
+  <text x="1320" y="855" text-anchor="middle" class="head">สมาชิกทีม</text><text x="1320" y="878" text-anchor="middle" class="small">ดูงานได้; หัวหน้าทีมจัดการสถานะ/ส่งงาน</text>
+  <path d="M1320 765 V825" class="edge"/>
+  <text x="72" y="1080" class="small">* เส้นทางบางส่วน เช่น เข้าสู่ระบบด้วย LINE และการสมัครสมาชิก จะแสดงตามการตั้งค่าระบบ</text>
+</svg>

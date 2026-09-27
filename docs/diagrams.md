@@ -6,6 +6,10 @@
 
 ภาพ SVG ด้านล่างบันทึกอยู่ใน Git และเปิดดูได้โดยตรง ภาพ Mermaid ฉบับละเอียดอยู่ในหัวข้อถัดไป
 
+### User Flow
+
+![User Flow ระบบ NP Place Control](images/user-flow.png)
+
 ### Use Case Diagram
 
 ![Use Case Diagram ระบบ NP Place Control](images/use-case-diagram.png)
