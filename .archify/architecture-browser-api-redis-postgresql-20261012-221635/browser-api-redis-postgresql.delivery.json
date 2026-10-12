@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "ea91ab76-f885-4000-841f-1a75445bd221",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/candidate.json",
+  "output": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html",
+  "specification": {
+    "sha256": "aed21ed0b4fdc69d86ca2225e98af4a0847628373664b6170a8eac1002852044",
+    "bytes": 26031
+  },
+  "artifact": {
+    "sha256": "822240505e7096ea138f194216e6f7647e05146d8ffdadf9ad0e214cbd6c7700",
+    "bytes": 782609
+  }
+}

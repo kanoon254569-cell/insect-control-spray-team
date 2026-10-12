@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "browser-check",
+  "evidenceKind": "automated-browser",
+  "status": "skipped",
+  "visualReview": "not-requested",
+  "provenance": "current",
+  "deliveryReceiptId": "834c269b-5ea5-40f1-94b3-04f6198a3151",
+  "artifact": {
+    "path": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html",
+    "sha256": "27fa5157ff0e241d4522acb791dd605af95042d896241d593d250a8b026e3ee9",
+    "bytes": 757857
+  },
+  "state": {
+    "detail": "read",
+    "motion": "still"
+  },
+  "chrome": {
+    "status": "unavailable",
+    "executable": null
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "containment": {
+    "status": "skipped",
+    "policy": "fit-or-reader-declared-readable-vertical-scroll",
+    "viewports": []
+  },
+  "themeStates": {
+    "status": "skipped",
+    "viewports": []
+  },
+  "readability": {
+    "status": "skipped",
+    "minimumProjectedNodeTextPx": 6,
+    "viewports": []
+  },
+  "viewerChrome": {
+    "status": "skipped",
+    "viewports": []
+  },
+  "captures": {
+    "status": "not-requested",
+    "screenshots": [],
+    "contactSheet": null
+  },
+  "sidecars": {
+    "directory": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/review-3",
+    "receipt": "browser-api-redis-postgresql.browser-check.json",
+    "files": []
+  },
+  "error": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path."
+}

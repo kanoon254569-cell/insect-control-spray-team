@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "แผนผังระบบ NP Place Control — ส่วนประกอบและเส้นทางข้อมูล",
+    "locale": "th",
+    "quality_profile": "showcase",
+    "output": ".archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html",
+    "translations": {
+      "page.title": "แผนภาพ: {title}",
+      "diagram.description.architecture": "แผนภาพสถาปัตยกรรมที่สร้างด้วย Archify",
+      "node.focus": "โฟกัสที่ {label}",
+      "node.focus.detail": "โฟกัสที่ {label} — {detail}",
+      "node.context.architecture": "ส่วนประกอบของสถาปัตยกรรม",
+      "legend.title": "คำอธิบายสัญลักษณ์",
+      "legend.architecture.frontend": "ส่วนหน้า",
+      "legend.architecture.backend": "ส่วนหลัง",
+      "legend.architecture.database": "ฐานข้อมูล",
+      "legend.architecture.external": "ผู้ใช้ / ระบบภายนอก",
+      "viewer.toolbar.actions": "เครื่องมือแผนภาพ",
+      "viewer.theme.toggle.title": "สลับธีม (T)",
+      "viewer.theme.toggle": "สลับธีมสี",
+      "viewer.theme.dark": "ธีมมืด",
+      "viewer.theme.light": "ธีมสว่าง",
+      "viewer.preset.choose.title": "เลือกรูปแบบภาพ (กด S เพื่อสลับ)",
+      "viewer.preset.choose": "เลือกรูปแบบภาพ",
+      "viewer.preset.style": "รูปแบบ",
+      "viewer.preset.menu": "รูปแบบภาพ",
+      "viewer.preset.identity": "อัตลักษณ์ภาพ",
+      "viewer.preset.cycles": "เพื่อสลับรูปแบบ",
+      "viewer.preset.classic": "คลาสสิก",
+      "viewer.preset.classic.short": "คลาสสิก",
+      "viewer.preset.classic.hint": "รูปแบบเทคนิคมาตรฐานที่อ่านง่าย",
+      "viewer.preset.current": "รูปแบบภาพปัจจุบัน: {style} — เลือกรูปแบบภาพ",
+      "viewer.present.enter": "เข้าสู่โหมดนำเสนอ",
+      "viewer.present.enter.title": "โหมดนำเสนอ (F)",
+      "viewer.present.present": "นำเสนอ",
+      "viewer.export.button": "ส่งออก",
+      "viewer.export.button.title": "ส่งออกแผนภาพ (E)",
+      "viewer.export.diagram": "ส่งออกแผนภาพ",
+      "viewer.export.menu": "ส่งออก",
+      "viewer.lens.legend": "คำอธิบายประเภทส่วนประกอบ",
+      "viewer.lens.open": "เปิดมุมมองประเภทส่วนประกอบ",
+      "viewer.lens.title": "เปรียบเทียบบทบาทของระบบ",
+      "viewer.lens.legend.inspect.one": "ตรวจสอบประเภท {label} จำนวน {count} รายการ",
+      "viewer.lens.legend.inspect.other": "ตรวจสอบประเภท {label} จำนวน {count} รายการ",
+      "viewer.lens.kind.count.one": "ประเภท {label} จำนวน {count} รายการ",
+      "viewer.lens.kind.count.other": "ประเภท {label} จำนวน {count} รายการ",
+      "viewer.nav.controls": "เครื่องมือควบคุมมุมมองแผนภาพ",
+      "viewer.nav.route": "ติดตามเส้นทางตามทิศทาง",
+      "viewer.nav.route.title": "ติดตามเส้นทาง (R)",
+      "viewer.nav.route.short": "เส้นทาง",
+      "viewer.nav.radar": "เปิดแผนที่ภาพรวมของระบบ",
+      "viewer.nav.radar.title": "แผนที่ภาพรวม (M)",
+      "viewer.nav.radar.short": "แผนที่",
+      "viewer.nav.lens": "เปิดมุมมองประเภทส่วนประกอบ",
+      "viewer.nav.lens.title": "มุมมองประเภท (L)",
+      "viewer.nav.lens.short": "ประเภท",
+      "viewer.nav.find": "ค้นหาส่วนประกอบ",
+      "viewer.nav.find.title": "ค้นหาส่วนประกอบ (/)",
+      "viewer.outline.title": "รายการส่วนประกอบ",
+      "viewer.rail.controls": "แผงด้านข้าง",
+      "viewer.rail.right": "ย้ายแผงมาไว้ข้างแผนภาพ",
+      "viewer.nav.guide": "เปิดคู่มือแผนภาพ",
+      "viewer.nav.guide.title": "คู่มือแผนภาพ (?)",
+      "viewer.nav.zoomOut": "ย่อ",
+      "viewer.nav.zoomOut.title": "ย่อ (-)",
+      "viewer.nav.reset": "คืนค่ามุมมองแผนภาพ",
+      "viewer.nav.reset.title": "คืนค่ามุมมอง (0)",
+      "viewer.nav.read": "อ่าน",
+      "viewer.nav.zoomIn": "ขยาย",
+      "viewer.nav.zoomIn.title": "ขยาย (+)",
+      "viewer.nav.detail.map": "ขยายเพื่อดูป้ายความสัมพันธ์และรายละเอียดส่วนประกอบ",
+      "viewer.nav.level.map": "ภาพรวม",
+      "viewer.nav.level.read": "อ่าน",
+      "viewer.nav.level.full": "รายละเอียด",
+      "viewer.nav.level.auto": "อัตโนมัติ",
+      "viewer.nav.camera": "{hint} · คืนค่ามุมมองแผนภาพ",
+      "viewer.nav.camera.title": "{semantic}{hint} · คืนค่ามุมมอง (0)",
+      "viewer.nav.camera.semantic": "เปิดใช้งานการเลื่อนมุมมองอัจฉริยะ · ",
+      "viewer.nav.detail.read": "ขยายอีกครั้งเพื่อแสดงแท็กและคำอธิบาย",
+      "viewer.passport.relationship.explorer": "เครื่องมือสำรวจความสัมพันธ์โดยตรง",
+      "viewer.passport.relationship.inspect": "ตรวจสอบความสัมพันธ์ที่ {index} จาก {total}: {from} ไปยัง {to}, {label} กด Enter เพื่อดูรายละเอียด",
+      "viewer.passport.sourceCount.one": "แหล่งอ้างอิงที่ตรวจสอบแล้ว {count} รายการ",
+      "viewer.passport.sourceCount.other": "แหล่งอ้างอิงที่ตรวจสอบแล้ว {count} รายการ",
+      "viewer.passport.sourceMarker": "แหล่งข้อมูล",
+      "viewer.radar.nodes": "โหนดในแผนที่ภาพรวมของแผนภาพ",
+      "viewer.radar.focus": "โฟกัสที่ {label} จากแผนที่ภาพรวม",
+      "viewer.rail.bottom": "ย้ายแผงไปไว้ใต้แผนภาพ",
+      "viewer.rail.collapse": "ยุบแผงด้านข้าง",
+      "viewer.finder.title": "ค้นหาส่วนประกอบ"
+    },
+    "repository": {
+      "url": "git@github.com:kanoon254569-cell/insect-control-spray-team.git",
+      "link_mode": "local-only",
+      "revision": "2b436319d70bf3683f7b264e0c59498fecdafe77"
+    },
+    "views": [
+      {
+        "id": "system-overview",
+        "label": "ภาพรวมระบบ",
+        "focus": ["browser", "webapp", "api", "postgres", "line-login", "line-messaging", "ocr", "redis"],
+        "note": "เส้นทางจริงของข้อมูลคือ Browser → React → Express → PostgreSQL"
+      },
+      {
+        "id": "login-session",
+        "label": "เข้าสู่ระบบและ Session",
+        "focus": ["browser", "webapp", "api", "postgres", "line-login"],
+        "note": "ดูการเข้าสู่ระบบปกติ, LINE Login, cookie และการเก็บ session"
+      },
+      {
+        "id": "customer-service",
+        "label": "แจ้งปัญหาและจองบริการ",
+        "focus": ["browser", "webapp", "api", "postgres", "line-messaging"],
+        "note": "ดูข้อมูลจากฟอร์มไปยัง problems หรือ bookings และ invoices"
+      },
+      {
+        "id": "job-lifecycle",
+        "label": "มอบหมายงานและปิดงาน",
+        "focus": ["browser", "webapp", "api", "postgres", "line-messaging"],
+        "note": "ติดตาม source request → job → สถานะงาน → contract"
+      },
+      {
+        "id": "billing-cache",
+        "label": "ชำระเงินและ Redis (แนวคิด)",
+        "focus": ["browser", "webapp", "api", "postgres", "ocr", "redis", "line-messaging"],
+        "note": "OCR ทำงานใน API; Redis เป็นข้อเสนอ ส่วนปัจจุบันเขียนฐานข้อมูลโดยตรง"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "ผู้ใช้งาน",
+      "sublabel": "ลูกค้า · ผู้ดูแล · ทีมช่าง",
+      "pos": [35, 315],
+      "size": [210, 100],
+      "sources": [
+        { "path": "src/App.tsx", "line": 647, "end_line": 662 }
+      ]
+    },
+    {
+      "id": "webapp",
+      "type": "frontend",
+      "label": "เว็บแอป React",
+      "sublabel": "Login · Customer · Admin · Technician",
+      "pos": [355, 315],
+      "size": [230, 100],
+      "sources": [
+        { "path": "src/main.tsx", "line": 1, "end_line": 9 },
+        { "path": "src/App.tsx", "line": 647, "end_line": 773 },
+        { "path": "src/components/LoginPage.tsx", "line": 25, "end_line": 44 }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Express API",
+      "sublabel": "Node.js · server.ts · กลุ่ม route ทั้งหมด",
+      "pos": [745, 305],
+      "size": [250, 140],
+      "sources": [
+        { "path": "server.ts", "line": 39, "end_line": 67 },
+        { "path": "server.ts", "line": 451, "end_line": 500 },
+        { "path": "server.ts", "line": 621, "end_line": 1546 }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "ฐานข้อมูลจริง · 10 models ผ่าน Prisma",
+      "pos": [1185, 310],
+      "size": [250, 130],
+      "sources": [
+        { "path": "prisma/schema.prisma", "line": 10, "end_line": 85 },
+        { "path": "prisma/schema.prisma", "line": 87, "end_line": 139 },
+        { "path": "prisma/schema.prisma", "line": 141, "end_line": 171 }
+      ]
+    },
+    {
+      "id": "line-login",
+      "type": "external",
+      "label": "LINE Login",
+      "sublabel": "OAuth 2.1 · ยืนยันตัวตนลูกค้า",
+      "pos": [745, 55],
+      "size": [240, 95],
+      "sources": [
+        { "path": "server.ts", "line": 311, "end_line": 385 },
+        { "path": "server.ts", "line": 644, "end_line": 692 }
+      ]
+    },
+    {
+      "id": "line-messaging",
+      "type": "external",
+      "label": "LINE Messaging API",
+      "sublabel": "ส่งข้อความแจ้งเตือนแบบ Push",
+      "pos": [1140, 65],
+      "size": [260, 100],
+      "sources": [
+        { "path": "server.ts", "line": 387, "end_line": 419 },
+        { "path": "src/services/line.ts", "line": 10, "end_line": 47 }
+      ]
+    },
+    {
+      "id": "ocr",
+      "type": "backend",
+      "label": "Tesseract.js OCR",
+      "sublabel": "ไลบรารีใน API · อ่านภาพสลิป",
+      "pos": [715, 610],
+      "size": [250, 105],
+      "sources": [
+        { "path": "server.ts", "line": 183, "end_line": 202 },
+        { "path": "server.ts", "line": 1051, "end_line": 1060 },
+        { "path": "src/components/CustomerPortal.tsx", "line": 242, "end_line": 274 }
+      ]
+    },
+    {
+      "id": "redis",
+      "type": "database",
+      "label": "Redis",
+      "sublabel": "แคชที่เสนอ · ไม่มีในระบบปัจจุบัน",
+      "tag": "แนวคิดเท่านั้น",
+      "pos": [1140, 610],
+      "size": [250, 105]
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-to-webapp",
+      "from": "browser",
+      "to": "webapp",
+      "label": "เข้าใช้งานตามบทบาท",
+      "variant": "emphasis"
+    },
+    {
+      "id": "webapp-to-api",
+      "from": "webapp",
+      "to": "api",
+      "label": "JSON · /api/* · Cookie",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-postgres",
+      "from": "api",
+      "to": "postgres",
+      "label": "PrismaPg · SQL · อ่าน / เขียน",
+      "variant": "emphasis",
+      "width": 2
+    },
+    {
+      "id": "webapp-to-line-login",
+      "from": "webapp",
+      "to": "line-login",
+      "label": "เปิดหน้าอนุญาต LINE",
+      "variant": "dashed"
+    },
+    {
+      "id": "api-to-line-login",
+      "from": "api",
+      "to": "line-login",
+      "label": "แลก code · ตรวจ ID token",
+      "variant": "security"
+    },
+    {
+      "id": "api-to-line-messaging",
+      "from": "api",
+      "to": "line-messaging",
+      "label": "Push แจ้งลูกค้า / ผู้ดูแล",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "left"
+    },
+    {
+      "id": "api-to-ocr",
+      "from": "api",
+      "to": "ocr",
+      "label": "ส่งภาพ data:image/* ให้ OCR"
+    },
+    {
+      "id": "api-to-redis-proposed",
+      "from": "api",
+      "to": "redis",
+      "label": "ตรวจแคช (ยังไม่มีจริง)",
+      "variant": "dashed"
+    },
+    {
+      "id": "redis-to-postgres-proposed",
+      "from": "redis",
+      "to": "postgres",
+      "label": "cache miss → query (แนวคิด)",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "อ่านภาพรวมเส้นทางจริง",
+      "items": [
+        "Production: เบราว์เซอร์เปิดเว็บแอปที่ Express เสิร์ฟจาก dist/ เมื่อมีไฟล์ build; โหมดพัฒนารัน Vite แยกจาก API",
+        "คำขอข้อมูล: หน้าจอ React → fetch('/api/...') พร้อม JSON และ cookie → Express ใน server.ts → PrismaPg → PostgreSQL",
+        "ข้อมูลตอบกลับย้อนจาก PostgreSQL → Prisma → Express JSON response → React อัปเดตหน้าจอ",
+        "Redis ยังไม่ได้ติดตั้งหรือเชื่อมต่อในเส้นทางจริง เส้นประ API → Redis → PostgreSQL เป็นแนวคิดเท่านั้น"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "เว็บแอปและบทบาทผู้ใช้",
+      "items": [
+        "src/main.tsx เริ่ม React และ src/App.tsx ดูแล session, route และสถานะข้อมูลของหน้าจอ",
+        "เส้นทางหน้าเว็บ: /login → เข้าระบบ, /customer → ลูกค้า, /user → ผู้ดูแล, /technician → ทีมช่าง",
+        "ลูกค้าแจ้งปัญหา/จองบริการ/ดูบิลและงาน; ผู้ดูแลจัดทีม/งาน/บิล/สัญญา; ทีมช่างดูงานและส่งรายงาน",
+        "หลังเริ่มแอป React เรียก GET /api/me; เมื่อมี session จะโหลด /api/state, /api/team-members และ /api/teams"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "เข้าสู่ระบบ โปรไฟล์ และ Session",
+      "items": [
+        "POST /api/login ตรวจ team_members ก่อน แล้วตรวจ users; รหัสผ่านถูก hash/ตรวจสอบฝั่ง server",
+        "POST /api/register สร้าง users แล้วสร้าง session; GET/PATCH /api/profile อ่านหรือแก้ชื่อ เบอร์โทร และที่อยู่",
+        "Session ID อยู่ใน cookie HttpOnly และแถว sessions ใน PostgreSQL; หมดอายุหลัง 8 ชั่วโมง และ API ที่ต้องล็อกอินใช้ requireSession",
+        "GET /api/auth/line/start ส่งผู้ใช้ไป LINE; callback แลก authorization code และตรวจ ID token แล้วสร้าง/อัปเดต users และ sessions",
+        "GET /api/config บอกหน้า Login ว่าปิดการสมัครหรือเปิด LINE Login อยู่หรือไม่; POST /api/logout ลบ session และ cookie"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "แจ้งปัญหา จองแพ็กเกจ และติดตาม",
+      "items": [
+        "GET /api/state อ่าน problems, bookings, contracts, jobs, invoices และ packages แล้วส่ง JSON ให้หน้าจอ",
+        "POST /api/problems รับชื่อ/เบอร์/ที่อยู่/ชนิดแมลง/รายละเอียด/ความเร่งด่วน → เพิ่มแถว problems",
+        "POST /api/bookings รับแพ็กเกจ/ลูกค้า/วันนัด/ราคา → เพิ่ม bookings และสร้าง invoices พร้อมกัน",
+        "การจองสร้างยอด VAT 7% และยอดรวม ปรับสถานะใบแจ้งหนี้เป็นค้างชำระ แล้วแจ้งลูกค้า/LINE",
+        "ผล /api/state ถูกกรองตามบทบาท: ลูกค้าเห็นรายการของตน; สมาชิกทีมเห็นงานของทีม; ผู้ดูแลได้ข้อมูลภาพรวม"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "มอบหมายงาน → ช่างทำงาน → สร้างสัญญา",
+      "items": [
+        "POST /api/jobs/assign รับ sourceId/sourceType (problem หรือ booking), ทีม, วันนัด และรายละเอียด; อ่านรายการต้นทาง",
+        "จากนั้นเพิ่ม jobs และปรับสถานะ/ทีม/วันนัดใน problems หรือสถานะ bookings พร้อมแจ้งลูกค้าและ LINE",
+        "PATCH /api/jobs/:jobId/status บันทึกสถานะ หมายเหตุ รูปรายงาน และสารเคมีใน jobs; เมื่อส่งงาน/ตรวจรับจึงซิงก์สถานะกลับ source record",
+        "สมาชิก team_member ถูกห้ามส่งงานด้วย route นี้; เมื่อสถานะถึงส่งงานหรือเสร็จสิ้น จะมีการแจ้ง LINE ตามเงื่อนไข",
+        "POST /api/jobs/:jobId/approve ปิดงาน อัปเดต problem/booking และสร้าง contract ในฐานข้อมูล"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "บิล สลิป และ OCR",
+      "items": [
+        "POST /api/invoices สร้างบิลโดยผู้ดูแล; PATCH /api/invoices/:invoiceId/status เปลี่ยนสถานะบิล",
+        "หน้าเว็บส่งภาพเป็น data URL ไป POST /api/receipts/ocr; Tesseract.js ใช้ worker ภาษา eng ใน process ของ API แล้วส่งยอด/ชื่อ/เวลาโอนกลับ",
+        "OCR เป็นการอ่านข้อความจากภาพ ไม่ได้บันทึกผลยืนยันชำระเงินในขั้นตอนนี้ และไม่ได้เรียก OCR ภายนอก",
+        "ผู้ใช้ส่งสลิปแยกผ่าน POST /api/invoices/:invoiceId/receipt; API ตรวจยอดคลาดเคลื่อนไม่เกิน 50 บาท",
+        "เมื่อยอดผ่านเงื่อนไข API ตั้ง invoices เป็นชำระเงินแล้วและเก็บรูป/ชื่อ/เวลา; โค้ดนี้ไม่ได้เชื่อมธนาคารเพื่อยืนยันธุรกรรม"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "ทีม สมาชิก และสัญญา",
+      "items": [
+        "GET/POST/PATCH /api/teams อ่าน สร้าง และแก้ทีมในตาราง teams",
+        "GET/POST/PATCH/DELETE /api/team-members จัดการสมาชิก รหัสผ่าน บทบาท ทีม และสถานะใน team_members",
+        "GET ของสมาชิกทีมจำกัดผลตาม teamId; การอ่าน /api/teams ก็จำกัดให้เห็นเฉพาะทีมของตน",
+        "PATCH/DELETE /api/contracts/:contractId แก้ไขหรือลบสัญญาใน contracts"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "ข้อมูลที่เก็บใน PostgreSQL",
+      "items": [
+        "users: บัญชี/role/passwordHash/โปรไฟล์; sessions: sessionId/role/วันหมดอายุ/team; team_members และ teams: บุคลากรกับทีม",
+        "packages: ราคา/ระยะเวลา/รายละเอียด/การรับประกัน/features; problems: ข้อมูลปัญหา ลูกค้า ความเร่งด่วน ทีม และสถานะ",
+        "bookings: แพ็กเกจ ลูกค้า วันนัด ราคา สถานะ invoiceNo; jobs: sourceId/sourceType ทีม สถานะ หมายเหตุ รูปรายงาน สารเคมี",
+        "invoices: ยอดก่อน VAT/VAT/ยอดรวม สถานะ dueDate รูปสลิป ผู้โอน เวลาโอน และข้อมูลตรวจรับชำระ",
+        "contracts: ลูกค้า แพ็กเกจ วันเริ่ม/สิ้นสุด จำนวนครั้งเข้าบริการ สถานะ และเลขเอกสาร; รูป imageReport/receiptDataUrl เก็บในฟิลด์ Text",
+        "การเชื่อม Booking/Problem → Job → Contract อ้างอิงด้วย sourceId/sourceType และรหัสในข้อมูล ไม่ได้ประกาศเป็น foreign key ใน Prisma"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "LINE และการแจ้งเตือน",
+      "items": [
+        "LINE Login ใช้ scope profile/openid; server ขอ token แล้วยืนยัน ID token กับ LINE ก่อนผูกผู้ใช้",
+        "LINE Messaging API ส่งข้อความแจ้งเตือนเมื่อสมัคร/เข้าสู่ระบบ แจ้งปัญหา จอง มอบหมายงาน อัปเดตงาน และชำระเงิน",
+        "บัญชี LINE Login ส่งถึง LINE user ID ของบัญชีนั้น; บัญชีอื่น/การแจ้งผู้ดูแลใช้ LINE_TARGET_USER_ID ที่ตั้งค่าไว้",
+        "ต้องตั้งค่า LINE channel ID/secret และ access token/target ID; หากไม่มีบางการแจ้งเตือนจะไม่ถูกส่ง"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "เริ่มระบบและตั้งค่าที่เกี่ยวข้อง",
+      "items": [
+        "Production ใช้ Render Web Service; build ใช้ npm install และ npm run build; คำสั่ง start deploy Prisma migrations แล้วเปิด Express",
+        "เมื่อมี dist/index.html Express เสิร์ฟ static files และส่งหน้าเว็บสำหรับ route ที่ไม่ใช่ /api",
+        "Local: npm run api เปิด Express (PORT หรือค่าเริ่มต้น 8787); npm run dev เปิด Vite ที่พอร์ต 3000",
+        "การเชื่อม PostgreSQL ใช้ DATABASE_URL; Render config ยังระบุ APP_URL และตัวแปร LINE_* สำหรับ OAuth/ข้อความ"
+      ]
+    }
+  ]
+}

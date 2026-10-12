@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "skipped",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/candidate.json",
+    "sha256": "aed21ed0b4fdc69d86ca2225e98af4a0847628373664b6170a8eac1002852044",
+    "bytes": 26031
+  },
+  "artifact": {
+    "path": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html",
+    "sha256": "822240505e7096ea138f194216e6f7647e05146d8ffdadf9ad0e214cbd6c7700",
+    "bytes": 782609
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "skipped"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/chrome-unavailable",
+      "severity": "warning",
+      "message": "Chrome or Chromium is unavailable. Set ARCHIFY_CHROME to its executable path.",
+      "subject": {
+        "artifact": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/browser-api-redis-postgresql.html"
+      },
+      "evidence": {
+        "executable": null
+      },
+      "supportedFixes": [
+        "set ARCHIFY_CHROME to a Chrome or Chromium executable and rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/review-6/browser-api-redis-postgresql.finalize.json",
+    "summaryReceipt": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/review-6/browser-api-redis-postgresql.finalize-summary.json",
+    "browserCheckReceipt": "/Volumes/ketamaine2jai/งาน งาน งาน/insect-control-spray-team/.archify/architecture-browser-api-redis-postgresql-20261012-221635/review-6/browser-api-redis-postgresql.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.0.1",
+    "availableVersion": "3.0.1",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-12T15:22:37.657Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 1202
+}
