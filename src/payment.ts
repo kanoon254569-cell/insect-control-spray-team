@@ -4,6 +4,11 @@ export interface ReceiptMetadata {
   transferTime: string | null;
 }
 
+function parseAmount(value: string) {
+  const amount = Number(value.replace(/,/g, ''));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 export function buildPromptPayPayload(phone: string, amount: number) {
   const cleanPhone = phone.replace(/[^0-9]/g, '');
   const amountString = String(Math.round(amount));
@@ -24,13 +29,23 @@ export function buildPromptPayPayload(phone: string, amount: number) {
 }
 
 export function extractReceiptMetadata(text: string): ReceiptMetadata {
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  const amountMatch = normalized.match(/(?:จำนวน|amount)\s*[: ]*([0-9,]+)\s*(บาท|baht)?/i);
-  const payerMatch = normalized.match(/(?:จาก|from)\s+(.{2,40})/i);
-  const timeMatch = normalized.match(/(\d{1,2}:\d{2}(?:\s*\d{2}:\d{2})?)/);
+  const lines = text
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  const normalized = lines.join(' ');
+  const amountSource = lines.find((line) => /(?:จำนวน(?:เงิน)?|ยอด(?:โอน|เงิน)?|amount|total|เงินบาท|baht|thb|฿)/i.test(line)) ?? normalized;
+  const amountMatch = amountSource.match(
+    /(?:จำนวน(?:เงิน)?|ยอด(?:โอน|เงิน)?|amount|total|เงินบาท|baht|thb)\s*[:\-]?\s*(?:฿\s*)?([0-9][0-9,]*(?:\.\d{1,2})?)/i
+  ) ?? amountSource.match(/฿\s*([0-9][0-9,]*(?:\.\d{1,2})?)/);
+  const payerLine = lines.find((line) => /(?:โอนเงินจาก|ผู้โอน|ชื่อผู้โอน|from|sender)/i.test(line)) ?? '';
+  const payerMatch = payerLine.match(/(?:โอนเงินจาก|ผู้โอน|ชื่อผู้โอน|from|sender)\s*[:\-]?\s*([ก-๙A-Za-z][ก-๙A-Za-z .'-]{1,79})/i);
+  const timeMatch = normalized.match(/(?:เวลา|time)\s*[:\-]?\s*(\d{1,2}:\d{2}(?::\d{2})?)/i)
+    ?? normalized.match(/(\d{1,2}:\d{2}(?::\d{2})?)/);
 
   return {
-    amount: amountMatch ? Number(amountMatch[1].replace(/,/g, '')) : null,
+    amount: amountMatch ? parseAmount(amountMatch[1]) : null,
     payerName: payerMatch ? payerMatch[1].trim() : null,
     transferTime: timeMatch ? timeMatch[1] : null
   };

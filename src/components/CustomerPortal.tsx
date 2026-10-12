@@ -245,6 +245,11 @@ export default function CustomerPortal({
       event.target.value = '';
       return;
     }
+    if (file.size > 7 * 1024 * 1024) {
+      alert('กรุณาเลือกภาพสลิปขนาดไม่เกิน 7 MB');
+      event.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -265,6 +270,7 @@ export default function CustomerPortal({
         }
 
         const metadata = payload.metadata ?? {};
+        const detectedFields = [metadata.amount, metadata.payerName, metadata.transferTime].filter(Boolean).length;
         setPaymentForm((prev) => ({
           ...prev,
           amount: metadata.amount ? String(metadata.amount) : prev.amount,
@@ -272,7 +278,11 @@ export default function CustomerPortal({
           transferTime: metadata.transferTime || prev.transferTime,
           receiptDataUrl: dataUrl
         }));
-        setOcrStatus('OCR สำเร็จ: ระบบอ่านข้อมูลจากภาพสลิปจริงผ่าน backend');
+        setOcrStatus(
+          detectedFields > 0
+            ? `OCR อ่านข้อมูลได้ ${detectedFields}/3 รายการ — กรุณาตรวจทานก่อนส่ง`
+            : 'OCR อ่านข้อความได้ แต่ไม่พบยอดเงิน/ชื่อผู้โอน/เวลา กรุณากรอกข้อมูลด้วยตนเอง'
+        );
       } catch {
         setPaymentForm((prev) => ({
           ...prev,

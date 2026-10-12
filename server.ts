@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
+import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createWorker } from 'tesseract.js';
@@ -182,23 +183,31 @@ const invoicesCollection = createPrismaCollection<Invoice>(prisma.invoice);
 
 async function analyzeReceiptImage(dataUrl: string) {
   if (!dataUrl.startsWith('data:image/')) {
-    return { amount: null, payerName: null, transferTime: null, rawText: '' };
+    return { amount: null, payerName: null, transferTime: null, rawText: '', hasText: false };
   }
 
+  let worker: Awaited<ReturnType<typeof createWorker>> | undefined;
   try {
-    const worker = await createWorker('eng');
+    worker = await createWorker('tha+eng', 1, {
+      // Cache the Thai and English models outside the project directory. The first request
+      // downloads them; later requests reuse this cache.
+      cachePath: path.join(tmpdir(), 'insect-control-ocr'),
+      ...(process.env.TESSERACT_LANG_PATH ? { langPath: process.env.TESSERACT_LANG_PATH } : {})
+    });
     const { data } = await worker.recognize(dataUrl);
-    await worker.terminate();
     const metadata = extractReceiptMetadata(data.text);
     return {
       amount: metadata.amount,
       payerName: metadata.payerName,
       transferTime: metadata.transferTime,
-      rawText: data.text
+      rawText: data.text,
+      hasText: data.text.trim().length > 0
     };
   } catch (error) {
     console.error('Receipt OCR failed', error);
-    return { amount: null, payerName: null, transferTime: null, rawText: '' };
+    return { amount: null, payerName: null, transferTime: null, rawText: '', hasText: false };
+  } finally {
+    await worker?.terminate();
   }
 }
 
@@ -1056,6 +1065,11 @@ app.post('/api/receipts/ocr', async (req, res) => {
   }
 
   const metadata = await analyzeReceiptImage(dataUrl);
+  if (!metadata.hasText) {
+    return res.status(422).json({
+      message: 'ไม่สามารถอ่านข้อความจากสลิปได้ กรุณาใช้ภาพที่ชัดเจน หรือกรอกข้อมูลด้วยตนเอง'
+    });
+  }
   return res.json({ ok: true, metadata });
 });
 
