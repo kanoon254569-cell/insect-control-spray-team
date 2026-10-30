@@ -797,9 +797,12 @@ app.post('/api/register', async (req, res) => {
     return res.status(403).json({ message: 'การสมัครบัญชีถูกปิดสำหรับระบบนี้' });
   }
 
-  const existing = await users.findOne({ username: normalizedUsername });
-  if (existing) {
-    return res.status(409).json({ message: 'มีบัญชีนี้ในระบบแล้ว กรุณาเข้าสู่ระบบ' });
+  const [existingUser, existingTeamMember] = await Promise.all([
+    users.findOne({ username: normalizedUsername }),
+    teamMembersCollection.findOne({ username: normalizedUsername })
+  ]);
+  if (existingUser || existingTeamMember) {
+    return res.status(409).json({ message: 'Username นี้มีผู้ใช้งานแล้ว กรุณาเลือกชื่ออื่น' });
   }
 
   const user = await createUser(normalizedUsername, password, role, normalizeDisplayName(displayName, normalizedUsername));
@@ -1466,10 +1469,14 @@ app.post('/api/team-members', async (req, res) => {
     return res.status(400).json({ message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' });
   }
 
-  // Check if username already exists
-  const existing = await teamMembersCollection.findOne({ username: username.toLowerCase() });
-  if (existing) {
-    return res.status(409).json({ message: 'Username นี้ถูกใช้งานแล้ว' });
+  const normalizedUsername = username.toLowerCase();
+  // A technician username must not overlap with any regular account.
+  const [existingTeamMember, existingUser] = await Promise.all([
+    teamMembersCollection.findOne({ username: normalizedUsername }),
+    users.findOne({ username: normalizedUsername })
+  ]);
+  if (existingTeamMember || existingUser) {
+    return res.status(409).json({ message: 'Username นี้มีผู้ใช้งานแล้ว กรุณาเลือกชื่ออื่น' });
   }
 
   const membersCount = await dbCount(teamMembersCollection);
@@ -1478,7 +1485,7 @@ app.post('/api/team-members', async (req, res) => {
     name,
     phone,
     email,
-    username: username.toLowerCase(),
+    username: normalizedUsername,
     passwordHash: hashPassword(password),
     role,
     teamId,

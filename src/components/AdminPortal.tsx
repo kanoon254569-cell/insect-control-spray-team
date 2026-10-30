@@ -1151,35 +1151,8 @@ export default function AdminPortal({
                     alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
                     return;
                   }
+                  setTeamMemberLoading(true);
                   try {
-                    if (editingMemberId) {
-                      const updateData: Partial<TeamMember> & { password?: string } = {
-                        name: teamForm.name,
-                        phone: teamForm.phone,
-                        email: teamForm.email,
-                        role: teamForm.role,
-                        teamId: teamForm.teamId,
-                        teamName: teamForm.teamName
-                      };
-                      if (teamForm.password) {
-                        updateData.password = teamForm.password;
-                      }
-                      await onUpdateTeamMember(editingMemberId, updateData);
-                      setEditingMemberId(null);
-                    } else {
-                      await onAddTeamMember({
-                        name: teamForm.name,
-                        phone: teamForm.phone,
-                        email: teamForm.email,
-                        username: teamForm.username,
-                        password: teamForm.password,
-                        role: teamForm.role,
-                        teamId: teamForm.teamId,
-                        teamName: teamForm.teamName,
-                        status: 'active'
-                      });
-                    }
-                    setTeamMemberLoading(true);
                     if (editingMemberId) {
                       const updateData: Partial<TeamMember> & { password?: string } = {
                         name: teamForm.name,
@@ -1210,8 +1183,8 @@ export default function AdminPortal({
                     setTeamSuccess(true);
                     setTimeout(() => setTeamSuccess(false), 2000);
                     setTeamForm({ name: '', phone: '', email: '', username: '', password: '', role: 'team_member', teamId: '', teamName: '' });
-                  } catch {
-                    alert('บันทึกข้อมูลไม่สำเร็จ');
+                  } catch (error) {
+                    alert(error instanceof Error ? error.message : 'บันทึกข้อมูลไม่สำเร็จ');
                   } finally {
                     setTeamMemberLoading(false);
                   }
