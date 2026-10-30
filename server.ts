@@ -744,12 +744,14 @@ app.post('/api/login', async (req, res) => {
   }
 
   // Then check regular users
-  const role = detectRoleFromUsername(normalizedUsername);
-  const user = await users.findOne({ username: normalizedUsername, role }, { projection: { _id: 0 } });
+  // Look up the stored role instead of inferring it from a small fixed set of
+  // usernames. This allows administrator accounts with a custom username.
+  const user = await users.findOne({ username: normalizedUsername }, { projection: { _id: 0 } });
   if (!user || typeof password !== 'string' || !verifyPassword(password, user.passwordHash)) {
     return res.status(401).json({ message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' });
   }
 
+  const role = isPortalRole(user.role) ? user.role : detectRoleFromUsername(normalizedUsername);
   const session = await createSession(role, normalizedUsername);
 
   // LINE แจ้งเตือน Regular User Login
