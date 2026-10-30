@@ -442,7 +442,7 @@ async function dbCount(collection: { countDocuments: () => Promise<number> }) {
 
 async function createIndexes() {
   await Promise.all([
-    users.createIndex({ username: 1, role: 1 }, { unique: true }),
+    users.createIndex({ username: 1 }, { unique: true }),
     sessions.createIndex({ sessionId: 1 }, { unique: true }),
     sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     teamMembersCollection.createIndex({ id: 1 }, { unique: true }),
@@ -797,7 +797,7 @@ app.post('/api/register', async (req, res) => {
     return res.status(403).json({ message: 'การสมัครบัญชีถูกปิดสำหรับระบบนี้' });
   }
 
-  const existing = await users.findOne({ username: normalizedUsername, role });
+  const existing = await users.findOne({ username: normalizedUsername });
   if (existing) {
     return res.status(409).json({ message: 'มีบัญชีนี้ในระบบแล้ว กรุณาเข้าสู่ระบบ' });
   }
