@@ -1,5 +1,5 @@
 -- Prevent a username from being reused by accounts with different portal roles.
-DROP INDEX "users_username_role_key";
+DROP INDEX IF EXISTS "users_username_role_key";
 
 -- Retain one account per username before enforcing the new constraint.
 -- Prefer the administrator-facing `user` role, then the oldest account.
