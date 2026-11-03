@@ -129,6 +129,7 @@ model Job {
   id              String  @id
   sourceId        String
   sourceType      String
+  visitNumber     Int?
   title           String
   description     String  @db.Text
   customerName    String
