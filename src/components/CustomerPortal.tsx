@@ -16,7 +16,9 @@ import {
   CreditCard,
   QrCode,
   Upload,
-  Receipt
+  Receipt,
+  Star,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PestProblem, ServicePackage, Booking, Contract, TechnicianJob, PestType, Invoice } from '../types';
@@ -47,6 +49,7 @@ interface CustomerPortalProps {
   jobs: TechnicianJob[];
   invoices: Invoice[];
   onUploadPaymentReceipt: (invoiceId: string, payload: { amount: number; payerName: string; transferTime: string; receiptDataUrl: string }) => Promise<void> | void;
+  onSubmitServiceReview: (contractId: string, payload: { visitNumber: number; rating: number; comment: string }) => Promise<void> | void;
 }
 
 export default function CustomerPortal({
@@ -58,7 +61,8 @@ export default function CustomerPortal({
   contracts,
   jobs,
   invoices,
-  onUploadPaymentReceipt
+  onUploadPaymentReceipt,
+  onSubmitServiceReview
 }: CustomerPortalProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'catalog' | 'report' | 'tracking' | 'contracts' | 'payments'>('catalog');
   
@@ -116,6 +120,11 @@ export default function CustomerPortal({
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [ocrStatus, setOcrStatus] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [reviewContractId, setReviewContractId] = useState<string | null>(null);
+  const [reviewVisitNumber, setReviewVisitNumber] = useState<number | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -341,6 +350,38 @@ export default function CustomerPortal({
       alert('จองบริการไม่สำเร็จ');
     } finally {
       setBookingLoading(false);
+    }
+  };
+
+  const openReviewForm = (contractId: string, visitNumber: number) => {
+    setReviewContractId(contractId);
+    setReviewVisitNumber(visitNumber);
+    setReviewRating(0);
+    setReviewComment('');
+  };
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewContractId || !reviewVisitNumber || reviewLoading) return;
+    if (!reviewRating) {
+      alert('กรุณาเลือกคะแนนอย่างน้อย 1 ดาว');
+      return;
+    }
+    try {
+      setReviewLoading(true);
+      await onSubmitServiceReview(reviewContractId, {
+        visitNumber: reviewVisitNumber,
+        rating: reviewRating,
+        comment: reviewComment
+      });
+      setReviewContractId(null);
+      setReviewVisitNumber(null);
+      setReviewRating(0);
+      setReviewComment('');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'ไม่สามารถบันทึกรีวิวได้');
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -1402,6 +1443,12 @@ export default function CustomerPortal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {contracts.map((con) => {
                     const progressPercent = (con.completedVisits / con.totalVisits) * 100;
+                    const reviews = con.reviews || [];
+                    const pendingVisit = Array.from({ length: con.completedVisits }, (_, index) => index + 1)
+                      .find((visitNumber) => !reviews.some((review) => review.visitNumber === visitNumber));
+                    const averageRating = reviews.length
+                      ? reviews.reduce((total, review) => total + review.rating, 0) / reviews.length
+                      : null;
                     return (
                       <div key={con.id} className="bg-white rounded-2xl border border-slate-100 shadow-xs p-6 space-y-4 text-left">
                         <div className="flex justify-between items-start">
@@ -1446,6 +1493,82 @@ export default function CustomerPortal({
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2">
+                              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">รีวิวการให้บริการแต่ละรอบ</p>
+                                <p className="mt-0.5 text-[11px] text-slate-500">ช่วยให้เราปรับปรุงการดูแลบ้านของคุณให้ดียิ่งขึ้น</p>
+                              </div>
+                            </div>
+                            {averageRating !== null && (
+                              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-amber-700">
+                                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                {averageRating.toFixed(1)}
+                              </span>
+                            )}
+                          </div>
+
+                          {reviews.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {reviews.map((review) => (
+                                <div key={review.visitNumber} className="rounded-lg bg-white/80 px-2.5 py-2 text-[11px] text-slate-600">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-bold text-slate-700">รอบที่ {review.visitNumber}</span>
+                                    <span className="flex items-center gap-0.5 text-amber-600">
+                                      {Array.from({ length: 5 }, (_, index) => (
+                                        <Star key={index} className={`h-3 w-3 ${index < review.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} />
+                                      ))}
+                                    </span>
+                                  </div>
+                                  {review.comment && <p className="mt-1 leading-relaxed">“{review.comment}”</p>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {pendingVisit ? (
+                            reviewContractId === con.id ? (
+                              <form onSubmit={handleReviewSubmit} className="mt-3 space-y-3 rounded-lg border border-amber-200 bg-white p-3">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold text-slate-800">ให้คะแนนรอบที่ {reviewVisitNumber}</span>
+                                  <button type="button" onClick={() => setReviewContractId(null)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-600">ยกเลิก</button>
+                                </div>
+                                <div className="flex gap-1" aria-label="เลือกคะแนน">
+                                  {Array.from({ length: 5 }, (_, index) => {
+                                    const score = index + 1;
+                                    return (
+                                      <button key={score} type="button" onClick={() => setReviewRating(score)} className="rounded p-0.5" aria-label={`${score} ดาว`}>
+                                        <Star className={`h-6 w-6 transition ${score <= reviewRating ? 'fill-amber-400 text-amber-400' : 'text-slate-200 hover:text-amber-300'}`} />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <textarea
+                                  value={reviewComment}
+                                  onChange={(e) => setReviewComment(e.target.value)}
+                                  maxLength={1000}
+                                  rows={2}
+                                  placeholder="เขียนความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
+                                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:border-amber-400"
+                                />
+                                <button type="submit" disabled={reviewLoading} className="rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700 disabled:opacity-60">
+                                  {reviewLoading ? 'กำลังบันทึก...' : 'ส่งคะแนนและรีวิว'}
+                                </button>
+                              </form>
+                            ) : (
+                              <button type="button" onClick={() => openReviewForm(con.id, pendingVisit)} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white transition hover:bg-amber-700">
+                                <Star className="h-3.5 w-3.5" /> ให้คะแนนรอบที่ {pendingVisit}
+                              </button>
+                            )
+                          ) : con.completedVisits > 0 ? (
+                            <p className="mt-3 text-[11px] font-semibold text-emerald-700">ขอบคุณที่ให้คะแนนครบทุกครั้งที่เข้าบริการแล้ว</p>
+                          ) : (
+                            <p className="mt-3 text-[11px] text-slate-500">เมื่อจบการให้บริการในแต่ละรอบ จะสามารถให้คะแนนได้ที่นี่</p>
+                          )}
                         </div>
 
                         {/* Next Scheduled date */}

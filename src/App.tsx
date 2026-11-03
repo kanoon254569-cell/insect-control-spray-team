@@ -346,6 +346,27 @@ export default function App() {
     showToast(data.message || 'สลิปถูกยืนยันและสถานะชำระเงินอัปเดตแล้ว', 'success');
   };
 
+  const handleSubmitServiceReview = async (
+    contractId: string,
+    payload: { visitNumber: number; rating: number; comment: string }
+  ) => {
+    const response = await fetch(`/api/contracts/${contractId}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message || 'บันทึกรีวิวไม่สำเร็จ');
+    }
+
+    const data = await response.json();
+    await loadServerState();
+    showToast(data.message || 'บันทึกคะแนนและรีวิวเรียบร้อยแล้ว');
+  };
+
   const handleAddProblem = async (newProb: {
     customerName: string;
     customerPhone: string;
@@ -729,6 +750,7 @@ export default function App() {
                   jobs={jobs}
                   invoices={invoices}
                   onUploadPaymentReceipt={handleUploadPaymentReceipt}
+                  onSubmitServiceReview={handleSubmitServiceReview}
                 />
               )}
 

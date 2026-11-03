@@ -949,6 +949,42 @@ app.get('/api/state', async (req, res) => {
   return res.json(state);
 });
 
+app.post('/api/contracts/:contractId/reviews', async (req, res) => {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  if (session.role !== 'customer') {
+    return res.status(403).json({ message: 'เฉพาะลูกค้าเท่านั้นที่สามารถให้คะแนนบริการได้' });
+  }
+
+  const { contractId } = req.params;
+  const visitNumber = Number(req.body?.visitNumber);
+  const rating = Number(req.body?.rating);
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+  const contract = await contractsCollection.findOne({ id: contractId }, { projection: { _id: 0 } });
+
+  if (!contract || (contract.createdBy !== session.username && contract.customerName !== session.displayName)) {
+    return res.status(404).json({ message: 'ไม่พบสัญญาบริการของคุณ' });
+  }
+  if (!Number.isInteger(visitNumber) || visitNumber < 1 || visitNumber > contract.completedVisits) {
+    return res.status(400).json({ message: 'รอบบริการนี้ยังไม่เสร็จสิ้น จึงยังให้คะแนนไม่ได้' });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ message: 'กรุณาให้คะแนนตั้งแต่ 1 ถึง 5 ดาว' });
+  }
+  if (comment.length > 1000) {
+    return res.status(400).json({ message: 'ความคิดเห็นต้องมีความยาวไม่เกิน 1,000 ตัวอักษร' });
+  }
+
+  const reviews = Array.isArray(contract.reviews) ? contract.reviews : [];
+  if (reviews.some((review: any) => Number(review.visitNumber) === visitNumber)) {
+    return res.status(409).json({ message: 'คุณให้คะแนนรอบบริการนี้ไปแล้ว' });
+  }
+
+  const review = { visitNumber, rating, ...(comment ? { comment } : {}), createdAt: new Date().toISOString() };
+  await contractsCollection.updateOne({ id: contractId }, { $set: { reviews: [...reviews, review] } });
+  return res.status(201).json({ ok: true, review, message: 'ขอบคุณสำหรับคะแนนและความคิดเห็นของคุณ' });
+});
+
 app.post('/api/problems', async (req, res) => {
   const session = await requireSession(req, res);
   if (!session) return;

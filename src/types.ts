@@ -79,6 +79,14 @@ export interface Contract {
   status: 'เปิดใช้งาน' | 'เสร็จสิ้นแล้ว' | 'ระงับชั่วคราว';
   documentNo: string;
   createdBy?: string;
+  reviews?: ServiceReview[];
+}
+
+export interface ServiceReview {
+  visitNumber: number;
+  rating: number;
+  comment?: string;
+  createdAt: string;
 }
 
 export interface TechnicianJob {

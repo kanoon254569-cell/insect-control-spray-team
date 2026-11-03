@@ -24,11 +24,11 @@ async function main() {
   const displayName = process.env.SEED_DISPLAYNAME || 'Administrator';
 
   const normalized = username.trim().toLowerCase();
-  const existing = await prisma.user.findFirst({ where: { username: normalized, role } });
+  const existing = await prisma.user.findUnique({ where: { username: normalized } });
   if (existing) {
     console.log('User already exists, updating password/displayName');
     await prisma.user.update({
-      where: { username_role: { username: normalized, role } },
+      where: { username: normalized },
       data: { passwordHash: hashPassword(password), displayName }
     });
     console.log('Updated existing user.');

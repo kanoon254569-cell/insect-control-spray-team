@@ -1,0 +1,2 @@
+ALTER TABLE "contracts"
+ADD COLUMN "reviews" JSONB NOT NULL DEFAULT '[]';

@@ -120,6 +120,7 @@ model Contract {
   status          String
   documentNo      String
   createdBy       String?
+  reviews         Json    @default("[]")
 
   @@map("contracts")
 }
