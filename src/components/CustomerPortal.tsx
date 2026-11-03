@@ -615,7 +615,7 @@ export default function CustomerPortal({
                           </div>
                           <div>
                             <label className="text-slate-500">เยี่ยมถัดไป</label>
-                            <p className="font-medium text-slate-700">{contract.nextVisitDate}</p>
+                            <p className="font-medium text-slate-700">{contract.nextVisitDate || 'รอการกำหนดวันนัด'}</p>
                           </div>
                         </div>
                       </div>
@@ -1575,7 +1575,7 @@ export default function CustomerPortal({
                         <div className="pt-3 border-t border-slate-50 flex justify-between items-center text-xs">
                           <div>
                             <span className="text-slate-400 block text-[10px]">นัดหมายรอบประเมินถัดไป:</span>
-                            <span className="font-bold text-slate-800">{new Date(con.nextVisitDate).toLocaleDateString('th-TH')}</span>
+                            <span className="font-bold text-slate-800">{con.nextVisitDate ? new Date(con.nextVisitDate).toLocaleDateString('th-TH') : 'รอการกำหนดวันนัด'}</span>
                           </div>
                           <div className="bg-amber-50 text-amber-800 p-2 rounded-lg text-[11px] font-semibold flex items-center">
                             <Calendar className="w-3.5 h-3.5 mr-1 text-amber-600" />

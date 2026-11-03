@@ -42,7 +42,7 @@ interface AdminPortalProps {
   packages: ServicePackage[];
   teamMembers: TeamMember[];
   teams: Team[];
-  onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking', teamName: string, date: string, title: string, desc: string) => Promise<void> | void;
+  onAssignJob: (sourceId: string, sourceType: 'problem' | 'booking' | 'contract', teamName: string, date: string, title: string, desc: string) => Promise<void> | void;
   onAddInvoice: (invoice: Omit<Invoice, 'id' | 'invoiceNo' | 'createdAt'>) => Promise<void> | void;
   onUpdateInvoiceStatus: (invoiceId: string, status: 'ค้างชำระ' | 'ชำระเงินแล้ว') => Promise<void> | void;
   onApproveJobCompletion: (jobId: string) => Promise<void> | void;
@@ -80,7 +80,7 @@ export default function AdminPortal({
 
   // Dispatch/Scheduling form states
   const [selectedSourceId, setSelectedSourceId] = useState<string>('');
-  const [selectedSourceType, setSelectedSourceType] = useState<'problem' | 'booking'>('problem');
+  const [selectedSourceType, setSelectedSourceType] = useState<'problem' | 'booking' | 'contract'>('problem');
   const [assignedTeam, setAssignedTeam] = useState<string>('');
   const [appointmentDate, setAppointmentDate] = useState<string>('');
   const [dispatchSuccess, setDispatchSuccess] = useState(false);
@@ -186,6 +186,11 @@ export default function AdminPortal({
 
   const pendingBookings = bookings.filter(b => b.status === 'รอยืนยัน').length;
   const pendingProblems = problems.filter(p => p.status === 'รอดำเนินการ').length;
+  const nextVisitContracts = contracts.filter((contract) =>
+    contract.status === 'เปิดใช้งาน' &&
+    contract.completedVisits < contract.totalVisits &&
+    !jobs.some((job) => job.sourceType === 'contract' && job.sourceId === contract.id && job.status !== 'เสร็จสิ้นและตรวจรับ')
+  );
   const activeJobsCount = jobs.filter(j => j.status !== 'เสร็จสิ้นและตรวจรับ').length;
 
   // Prepare Recharts Data for Pest Problems Chart
@@ -222,11 +227,18 @@ export default function AdminPortal({
         title = `กำจัด${prob.pestType}หน้างานเร่งด่วน`;
         desc = prob.description;
       }
-    } else {
+    } else if (selectedSourceType === 'booking') {
       const book = bookings.find(b => b.id === selectedSourceId);
       if (book) {
         title = `พ่นเคมีบริการติดตั้ง: ${book.packageName.split(' (')[0]}`;
         desc = `ลูกค้าซื้อแพ็กเกจ ${book.packageName} นัดวันประเมินความปลอดภัยครั้งแรก`;
+      }
+    } else {
+      const contract = contracts.find(c => c.id === selectedSourceId);
+      if (contract) {
+        const visitNumber = contract.completedVisits + 1;
+        title = `เข้าบริการตามสัญญา: ${contract.packageName} (รอบ ${visitNumber})`;
+        desc = `เข้าตรวจและดูแลตามสัญญา ${contract.documentNo} รอบที่ ${visitNumber} จากทั้งหมด ${contract.totalVisits} รอบ`;
       }
     }
 
@@ -530,6 +542,14 @@ export default function AdminPortal({
                         </option>
                       ))}
                     </optgroup>
+
+                    <optgroup label={`สัญญาที่รอกำหนดรอบถัดไป (${nextVisitContracts.length} สัญญา)`}>
+                      {nextVisitContracts.map((contract) => (
+                        <option key={contract.id} value={`contract:${contract.id}`}>
+                          {contract.documentNo} - {contract.customerName} (รอบ {contract.completedVisits + 1}/{contract.totalVisits})
+                        </option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
 
@@ -705,6 +725,62 @@ export default function AdminPortal({
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Queue 3: Follow-up visits for active contracts */}
+            <div>
+              <h3 className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider mb-3 flex items-center">
+                <Calendar className="w-4 h-4 mr-1.5" />
+                <span>สัญญาที่พร้อมกำหนดรอบบริการถัดไป ({nextVisitContracts.length} สัญญา)</span>
+              </h3>
+
+              {nextVisitContracts.length === 0 ? (
+                <div className="p-4 bg-slate-50 rounded-xl text-xs text-center text-slate-500 border border-slate-100">
+                  ยังไม่มีสัญญาที่รอกำหนดรอบถัดไป
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-emerald-100 rounded-xl">
+                  <table className="w-full text-xs">
+                    <thead className="bg-emerald-50/60 text-emerald-900 text-left border-b border-emerald-100">
+                      <tr>
+                        <th className="p-3">เลขที่สัญญา</th>
+                        <th className="p-3">ลูกค้า</th>
+                        <th className="p-3">ความคืบหน้า</th>
+                        <th className="p-3">รอบที่ต้องนัด</th>
+                        <th className="p-3">การจัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {nextVisitContracts.map((contract) => {
+                        const nextVisit = contract.completedVisits + 1;
+                        return (
+                          <tr key={contract.id} className="hover:bg-emerald-50/30">
+                            <td className="p-3 font-mono font-bold text-slate-700">{contract.documentNo}</td>
+                            <td className="p-3">
+                              <div className="font-semibold text-slate-800">{contract.customerName}</div>
+                              <div className="text-[10px] text-slate-500">{contract.customerPhone}</div>
+                            </td>
+                            <td className="p-3 font-bold text-slate-700">{contract.completedVisits}/{contract.totalVisits} รอบเสร็จแล้ว</td>
+                            <td className="p-3"><span className="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">รอบ {nextVisit}</span></td>
+                            <td className="p-3">
+                              <button
+                                onClick={() => {
+                                  setSelectedSourceType('contract');
+                                  setSelectedSourceId(contract.id);
+                                  setAppointmentDate('');
+                                }}
+                                className="bg-emerald-600 text-white px-2.5 py-1.5 rounded-lg font-bold text-[11px] hover:bg-emerald-700 cursor-pointer"
+                              >
+                                กำหนดรอบ {nextVisit}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -991,7 +1067,11 @@ export default function AdminPortal({
                             disabled={jobApprovalLoadingId === job.id}
                             className={`font-bold text-[10px] px-2 py-1 rounded-md ${jobApprovalLoadingId === job.id ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}`}
                           >
-                            {jobApprovalLoadingId === job.id ? 'กำลังตรวจรับ...' : 'ตรวจรับงาน'}
+                            {jobApprovalLoadingId === job.id
+                              ? 'กำลังตรวจรับ...'
+                              : job.sourceType === 'contract'
+                                ? 'ตรวจรับ & เปิดคิวรอบถัดไป'
+                                : 'ตรวจรับ & สร้างสัญญา'}
                           </button>
                         ) : (
                           <span className="text-[10px] text-slate-400 font-medium">ตรวจรับเสร็จสมบูรณ์</span>

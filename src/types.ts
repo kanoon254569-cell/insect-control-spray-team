@@ -91,8 +91,9 @@ export interface ServiceReview {
 
 export interface TechnicianJob {
   id: string;
-  sourceId: string; // references PestProblem.id or Booking.id
-  sourceType: 'problem' | 'booking';
+  sourceId: string; // references PestProblem.id, Booking.id, or Contract.id
+  sourceType: 'problem' | 'booking' | 'contract';
+  visitNumber?: number;
   title: string;
   description: string;
   customerName: string;

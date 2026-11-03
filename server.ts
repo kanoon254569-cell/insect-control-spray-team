@@ -621,6 +621,8 @@ async function syncJobSourceStatus(job: TechnicianJob, status: JobStatus, update
     return;
   }
 
+  if (job.sourceType === 'contract') return;
+
   const nextStatus = status === 'ส่งงานแล้ว' ? 'กำลังจัดทีมงาน' : status === 'เสร็จสิ้นและตรวจรับ' ? 'เสร็จสิ้น' : null;
   if (nextStatus) await bookingsCollection.updateOne({ id: job.sourceId }, { $set: { status: nextStatus } });
 }
@@ -1177,10 +1179,29 @@ app.post('/api/jobs/assign', async (req, res) => {
     return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
   }
 
-  const source = await getSourceRecord(sourceType, sourceId);
+  if (!['problem', 'booking', 'contract'].includes(sourceType)) {
+    return res.status(400).json({ message: 'ประเภทรายการต้นทางไม่ถูกต้อง' });
+  }
+
+  const source = sourceType === 'contract'
+    ? await contractsCollection.findOne({ id: sourceId }, { projection: { _id: 0 } })
+    : await getSourceRecord(sourceType, sourceId);
   if (!source) {
     return res.status(404).json({ message: 'ไม่พบรายการต้นทาง' });
   }
+
+  const contract = sourceType === 'contract' ? source as Contract : null;
+  if (contract && (contract.status !== 'เปิดใช้งาน' || contract.completedVisits >= contract.totalVisits)) {
+    return res.status(400).json({ message: 'สัญญานี้ไม่มีรอบบริการคงเหลือให้จัดคิว' });
+  }
+  const hasActiveContractJob = contract && await jobsCollection.findOne(
+    { sourceId, sourceType: 'contract', status: { $ne: 'เสร็จสิ้นและตรวจรับ' } },
+    { projection: { _id: 0 } }
+  );
+  if (hasActiveContractJob) {
+    return res.status(409).json({ message: 'สัญญานี้มีรอบบริการที่จัดคิวไว้แล้ว' });
+  }
+  const visitNumber = contract ? contract.completedVisits + 1 : undefined;
 
   const job: JobDocument = {
     id: makeId('job', 500, await dbCount(jobsCollection)),
@@ -1194,6 +1215,7 @@ app.post('/api/jobs/assign', async (req, res) => {
     appointmentDate: date,
     assignedTeam: teamName,
     status: 'กำลังเตรียมตัว',
+    ...(visitNumber ? { visitNumber } : {}),
     chemicalsUsed: [],
     createdBy: source.createdBy,
     createdAt: new Date().toISOString()
@@ -1201,7 +1223,9 @@ app.post('/api/jobs/assign', async (req, res) => {
 
   await jobsCollection.insertOne(job);
 
-  if (sourceType === 'problem') {
+  if (sourceType === 'contract') {
+    await contractsCollection.updateOne({ id: sourceId }, { $set: { nextVisitDate: date } });
+  } else if (sourceType === 'problem') {
     await problemsCollection.updateOne(
       { id: sourceId },
       { $set: { status: 'จัดสรรคิวช่างแล้ว', assignedTeam: teamName, appointmentDate: date } }
@@ -1211,7 +1235,9 @@ app.post('/api/jobs/assign', async (req, res) => {
   }
   await notifyCustomer(
     source.createdBy,
-    `จัดคิวทีมงานแล้ว\nงาน: ${job.id}\nทีม: ${teamName}\nวันนัดหมาย: ${date}\nสถานะ: ${job.status}`
+    contract
+      ? `นัดหมายบริการตามสัญญาแล้ว\nสัญญา: ${contract.documentNo}\nรอบบริการ: ${visitNumber}/${contract.totalVisits}\nทีม: ${teamName}\nวันนัดหมาย: ${date}`
+      : `จัดคิวทีมงานแล้ว\nงาน: ${job.id}\nทีม: ${teamName}\nวันนัดหมาย: ${date}\nสถานะ: ${job.status}`
   );
 
   void sendLineNotification(
@@ -1302,6 +1328,32 @@ app.post('/api/jobs/:jobId/approve', async (req, res) => {
   if (!job) {
     return res.status(404).json({ message: 'ไม่พบงานช่าง' });
   }
+  if (job.status === 'เสร็จสิ้นและตรวจรับ') {
+    return res.status(409).json({ message: 'งานนี้ตรวจรับเรียบร้อยแล้ว' });
+  }
+
+  if (job.sourceType === 'contract') {
+    const contract = await contractsCollection.findOne({ id: job.sourceId }, { projection: { _id: 0 } });
+    if (!contract) {
+      return res.status(404).json({ message: 'ไม่พบสัญญาที่อ้างอิงจากงานนี้' });
+    }
+
+    const completedVisits = Math.min(contract.totalVisits, Math.max(contract.completedVisits, job.visitNumber ?? contract.completedVisits + 1));
+    const completedContract = completedVisits >= contract.totalVisits;
+    await jobsCollection.updateOne({ id: jobId }, { $set: { status: 'เสร็จสิ้นและตรวจรับ' } });
+    await contractsCollection.updateOne(
+      { id: contract.id },
+      { $set: { completedVisits, nextVisitDate: '', ...(completedContract ? { status: 'เสร็จสิ้นแล้ว' } : {}) } }
+    );
+    await notifyCustomer(
+      job.createdBy || contract.createdBy,
+      completedContract
+        ? `ตรวจรับบริการรอบสุดท้ายเรียบร้อย\nสัญญา: ${contract.documentNo}\nขอบคุณที่ไว้วางใจเรา กรุณาให้คะแนนการบริการในหน้าสัญญาของคุณ`
+        : `ตรวจรับบริการรอบที่ ${completedVisits} เรียบร้อย\nสัญญา: ${contract.documentNo}\nกรุณาให้คะแนนการบริการในหน้าสัญญาของคุณ`
+    );
+
+    return res.json({ ok: true, contract: { ...contract, completedVisits, nextVisitDate: '', status: completedContract ? 'เสร็จสิ้นแล้ว' : contract.status } });
+  }
 
   const contractCount = await dbCount(contractsCollection);
   const contract: Contract = {
@@ -1323,7 +1375,8 @@ app.post('/api/jobs/:jobId/approve', async (req, res) => {
     nextVisitDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     price: job.title.includes('พ่นเคมี') ? 8500 : 15000,
     status: 'เปิดใช้งาน',
-    documentNo: `CONT-2026-${300 + contractCount + 1}`
+    documentNo: `CONT-2026-${300 + contractCount + 1}`,
+    createdBy: job.createdBy
   };
 
   await jobsCollection.updateOne({ id: jobId }, { $set: { status: 'เสร็จสิ้นและตรวจรับ' } });

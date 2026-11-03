@@ -422,7 +422,7 @@ export default function App() {
   // 3. Admin: Assign/Dispatch technician team
   const handleAssignJob = async (
     sourceId: string, 
-    sourceType: 'problem' | 'booking', 
+    sourceType: 'problem' | 'booking' | 'contract',
     teamName: string, 
     date: string,
     title: string,
@@ -477,7 +477,7 @@ export default function App() {
 
     const data = await response.json();
     await loadServerState();
-    showToast(`แอดมินตรวจรับสำเร็จ! เปิดสัญญารับประกันเลขที่ ${data.contract.documentNo} ดูแลระยะยาว 1 ปีให้ลูกค้าเรียบร้อย`);
+    showToast(`ตรวจรับงานสำเร็จ! สัญญา ${data.contract.documentNo} บันทึกการให้บริการแล้ว ${data.contract.completedVisits}/${data.contract.totalVisits} รอบ`);
   };
 
   // 6. Admin: Manual Invoice creation
